@@ -4,44 +4,76 @@ sys.path.append('/home/ehab/MyFiles/Softex/spacePy/spacepy-0.1.5')
 import math
 import numpy
 import scipy
+import bisect
 import scipy.stats
 import datetime
+from datetime import date
 from spacepy import pycdf
+from spacepy import seapy
 from itertools import chain
 import spacepy.time as spt
 import matplotlib.pyplot as plt
-from getswdata import getOMNIfiles
+from getswdata import getOMNIfiles, dataClean
 
-OMNIfnames = getOMNIfiles(['2002/06','2002/07','2004'],'/home/ehab/SWData','5min')
-for i in OMNIfnames:
- print i
-sys.exit()
-
-cdf = pycdf.CDF(OMNIfnames[0])
-cdfData01 = cdf.copy()
-cdf = pycdf.CDF(OMNIfnames[1])
-cdfData02 = cdf.copy()
+OMNIfnames = getOMNIfiles(['2005'],'/home/ehab/SWData','hourly')
+cdfData = []
+for i in range(len(OMNIfnames)):
+ cdf = pycdf.CDF(OMNIfnames[i])
+ cdfData.append(cdf.copy())
 cdf.close()
 
-def dataClean(listName,threshold):
-    for i in listName:
-     if i >= threshold: listName.remove(i)
-    return listName
+epochs = []
+SWV = []; SWN = []; SWT = []
+SWBx= []; SWBy= []; SWBz= []
+for i in range(len(OMNIfnames)): 
+ epochs = epochs + list(cdfData[i]['Epoch'])
+ SWV    = SWV + list(cdfData[i]['V'])
+ SWN    = SWN + list(cdfData[i]['N'])
+ SWT    = SWT + list(cdfData[i]['T'])
+ SWBx   = SWBx+ list(cdfData[i]['BX_GSE'])
+ SWBy   = SWBy+ list(cdfData[i]['BY_GSE'])
+ SWBz   = SWBz+ list(cdfData[i]['BZ_GSE'])
 
-#print cdfData01.keys()
+SWV = dataClean(SWV,2500.0)
+SWN = dataClean(SWN,999.0)
+SWT = dataClean(SWT,1.0e6)
 
+sEpoch = datetime.datetime(2005, 1, 1, 0, 0)
+eEpoch = datetime.datetime(2005,12,31,23,59)
+sEpochYYID = bisect.bisect_left(epochs, sEpoch)
+eEpochYYID = bisect.bisect_left(epochs, eEpoch)
+
+sEpoch = datetime.datetime(2005, 1, 1, 0, 0)
+eEpoch = datetime.datetime(2005, 6,30,23,59)
+sEpochJJID = bisect.bisect_left(epochs, sEpoch)
+eEpochJJID = bisect.bisect_left(epochs, eEpoch)
+
+sEpoch = datetime.datetime(2005, 7, 1, 0, 0)
+eEpoch = datetime.datetime(2005,12,31,23,59)
+sEpochJDID = bisect.bisect_left(epochs, sEpoch)
+eEpochJDID = bisect.bisect_left(epochs, eEpoch)
+
+plt.figure(1)
+time = epochs[sEpochYYID:eEpochYYID]
+data = SWV[sEpochYYID:eEpochYYID]
+plt.plot(time,data)
+time = epochs[sEpochJJID:eEpochJJID]
+data = SWV[sEpochJJID:eEpochJJID]
+plt.plot(time,data)
+time = epochs[sEpochJDID:eEpochJDID]
+data = SWV[sEpochJDID:eEpochJDID]
+plt.plot(time,data)
+plt.show()
+
+plt.figure(2)
 plt.subplot(2, 3, 1)
-SWV = list(chain(*zip(cdfData01['V'],cdfData02['V'])))
-SWV = dataClean(SWV,2500)
-stride = (max(SWV)-min(SWV))/100
-bins=numpy.arange(min(SWV)-stride,max(SWV)+stride,stride)
-SWVHST = scipy.stats.histogram2(SWV,bins)
+stride = (max(SWV[sEpochYYID:eEpochYYID])-min(SWV[sEpochYYID:eEpochYYID]))/200
+bins=numpy.arange(min(SWV[sEpochYYID:eEpochYYID])-stride,max(SWV[sEpochYYID:eEpochYYID])+stride,stride)
+SWVHST = scipy.stats.histogram2(SWV[sEpochYYID:eEpochYYID],bins)
 plt.plot(bins,SWVHST,label='Jan-Dec')
-SWV = cdfData01['V']
-SWVHST = scipy.stats.histogram2(SWV,bins)
+SWVHST = scipy.stats.histogram2(SWV[sEpochJJID:eEpochJJID],bins)
 plt.plot(bins,SWVHST,label='Jan-Jun')
-SWV = cdfData02['V']
-SWVHST = scipy.stats.histogram2(SWV,bins)
+SWVHST = scipy.stats.histogram2(SWV[sEpochJDID:eEpochJDID],bins)
 plt.plot(bins,SWVHST,label='Jul-Dec')
 plt.title('Solar Wind Speed PDF')
 plt.xlabel('Solar Wind Speed (Km/s) (stride = '+ str(stride) + ' Km/s)')
@@ -49,17 +81,13 @@ plt.ylabel('Number of Occurance')
 plt.legend()
 
 plt.subplot(2, 3, 2)
-SWN = list(chain(*zip(cdfData01['N'],cdfData02['N'])))
-SWN = dataClean(SWN,999)
-stride = (max(SWN)-min(SWN))/100
-bins=numpy.arange(min(SWN)-stride,max(SWN)+stride,stride)
-SWNHST = scipy.stats.histogram2(SWN,bins)
+stride = (max(SWN[sEpochYYID:eEpochYYID])-min(SWN[sEpochYYID:eEpochYYID]))/200
+bins=numpy.arange(min(SWN[sEpochYYID:eEpochYYID])-stride,max(SWN[sEpochYYID:eEpochYYID])+stride,stride)
+SWNHST = scipy.stats.histogram2(SWN[sEpochYYID:eEpochYYID],bins)
 plt.plot(bins,SWNHST,label='Jan-Dec')
-SWN = cdfData01['N']
-SWNHST = scipy.stats.histogram2(SWN,bins)
+SWNHST = scipy.stats.histogram2(SWN[sEpochJJID:eEpochJJID],bins)
 plt.plot(bins,SWNHST,label='Jan-Jun')
-SWN = cdfData02['N']
-SWNHST = scipy.stats.histogram2(SWN,bins)
+SWNHST = scipy.stats.histogram2(SWN[sEpochJDID:eEpochJDID],bins)
 plt.plot(bins,SWNHST,label='Jul-Dec')
 plt.title('Solar Wind Density PDF')
 plt.xlabel('Solar Wind Density (N/cc) (stride = '+ str(stride) + ' N/cc)')
@@ -67,16 +95,13 @@ plt.ylabel('Number of Occurance')
 plt.legend()
 
 plt.subplot(2, 3, 3)
-SWT = list(chain(*zip(cdfData01['T'],cdfData02['T'])))
-stride = (max(SWT)-min(SWT))/100
-bins=numpy.arange(min(SWT)-stride,max(SWT)+stride,stride)
-SWTHST = scipy.stats.histogram2(SWT,bins)
+stride = (max(SWT[sEpochYYID:eEpochYYID])-min(SWT[sEpochYYID:eEpochYYID]))/1000
+bins=numpy.arange(min(SWT[sEpochYYID:eEpochYYID])-stride,max(SWT[sEpochYYID:eEpochYYID])+stride,stride)
+SWTHST = scipy.stats.histogram2(SWT[sEpochYYID:eEpochYYID],bins)
 plt.plot(bins,SWTHST,label='Jan-Dec')
-SWT = cdfData01['T']
-SWTHST = scipy.stats.histogram2(SWT,bins)
+SWTHST = scipy.stats.histogram2(SWT[sEpochJJID:eEpochJJID],bins)
 plt.plot(bins,SWTHST,label='Jan-Jun')
-SWT = cdfData02['T']
-SWTHST = scipy.stats.histogram2(SWT,bins)
+SWTHST = scipy.stats.histogram2(SWT[sEpochJDID:eEpochJDID],bins)
 plt.plot(bins,SWTHST,label='Jul-Dec')
 plt.title('Solar Wind Temperature PDF')
 plt.xlabel('Solar Wind Temperature ($K^o$) (stride = '+ str(stride) + ' $K^o$)')
@@ -84,53 +109,44 @@ plt.ylabel('Number of Occurance')
 plt.legend()
 
 plt.subplot(2, 3, 4)
-SWB = list(chain(*zip(cdfData01['BX_GSE'],cdfData02['BX_GSE'])))
-stride = (max(SWB)-min(SWB))/100
-bins=numpy.arange(min(SWB)-stride,max(SWB)+stride,stride)
-SWBHST = scipy.stats.histogram2(SWB,bins)
+stride = (max(SWBx[sEpochYYID:eEpochYYID])-min(SWBx[sEpochYYID:eEpochYYID]))/100
+bins=numpy.arange(min(SWBx[sEpochYYID:eEpochYYID])-stride,max(SWBx[sEpochYYID:eEpochYYID])+stride,stride)
+SWBHST = scipy.stats.histogram2(SWBx[sEpochYYID:eEpochYYID],bins)
 plt.plot(bins,SWBHST,label='Jan-Dec')
-SWB = cdfData01['BX_GSE']
-SWBHST = scipy.stats.histogram2(SWB,bins)
+SWBHST = scipy.stats.histogram2(SWBx[sEpochJJID:eEpochJJID],bins)
 plt.plot(bins,SWBHST,label='Jan-Jun')
-SWB = cdfData02['BX_GSE']
-SWBHST = scipy.stats.histogram2(SWB,bins)
+SWBHST = scipy.stats.histogram2(SWBx[sEpochJDID:eEpochJDID],bins)
 plt.plot(bins,SWBHST,label='Jul-Dec')
-plt.title('Solar Wind Bx PDF')
-plt.xlabel('Solar Wind Bx (nT) (stride = '+ str(stride) + ' nT)')
+plt.title('Solar Wind Bx_GSE PDF')
+plt.xlabel('Solar Wind Bx_GSE (nT) (stride = '+ str(stride) + ' nT)')
 plt.ylabel('Number of Occurance')
 plt.legend()
 
 plt.subplot(2, 3, 5)
-SWB = list(chain(*zip(cdfData01['BY_GSE'],cdfData02['BY_GSE'])))
-stride = (max(SWB)-min(SWB))/100
-bins=numpy.arange(min(SWB)-stride,max(SWB)+stride,stride)
-SWBHST = scipy.stats.histogram2(SWB,bins)
+stride = (max(SWBy[sEpochYYID:eEpochYYID])-min(SWBy[sEpochYYID:eEpochYYID]))/100
+bins=numpy.arange(min(SWBy[sEpochYYID:eEpochYYID])-stride,max(SWBy[sEpochYYID:eEpochYYID])+stride,stride)
+SWBHST = scipy.stats.histogram2(SWBy[sEpochYYID:eEpochYYID],bins)
 plt.plot(bins,SWBHST,label='Jan-Dec')
-SWB = cdfData01['BY_GSE']
-SWBHST = scipy.stats.histogram2(SWB,bins)
+SWBHST = scipy.stats.histogram2(SWBy[sEpochJJID:eEpochJJID],bins)
 plt.plot(bins,SWBHST,label='Jan-Jun')
-SWB = cdfData02['BY_GSE']
-SWBHST = scipy.stats.histogram2(SWB,bins)
+SWBHST = scipy.stats.histogram2(SWBy[sEpochJDID:eEpochJDID],bins)
 plt.plot(bins,SWBHST,label='Jul-Dec')
-plt.title('Solar Wind By PDF')
-plt.xlabel('Solar Wind By (nT) (stride = '+ str(stride) + ' nT)')
+plt.title('Solar Wind By_GSE PDF')
+plt.xlabel('Solar Wind By_GSE (nT) (stride = '+ str(stride) + ' nT)')
 plt.ylabel('Number of Occurance')
 plt.legend()
 
 plt.subplot(2, 3, 6)
-SWB = list(chain(*zip(cdfData01['BZ_GSE'],cdfData02['BZ_GSE'])))
-stride = (max(SWB)-min(SWB))/100
-bins=numpy.arange(min(SWB)-stride,max(SWB)+stride,stride)
-SWBHST = scipy.stats.histogram2(SWB,bins)
+stride = (max(SWBz[sEpochYYID:eEpochYYID])-min(SWBz[sEpochYYID:eEpochYYID]))/100
+bins=numpy.arange(min(SWBz[sEpochYYID:eEpochYYID])-stride,max(SWBz[sEpochYYID:eEpochYYID])+stride,stride)
+SWBHST = scipy.stats.histogram2(SWBz[sEpochYYID:eEpochYYID],bins)
 plt.plot(bins,SWBHST,label='Jan-Dec')
-SWB = cdfData01['BZ_GSE']
-SWBHST = scipy.stats.histogram2(SWB,bins)
+SWBHST = scipy.stats.histogram2(SWBz[sEpochJJID:eEpochJJID],bins)
 plt.plot(bins,SWBHST,label='Jan-Jun')
-SWB = cdfData02['BZ_GSE']
-SWBHST = scipy.stats.histogram2(SWB,bins)
+SWBHST = scipy.stats.histogram2(SWBz[sEpochJDID:eEpochJDID],bins)
 plt.plot(bins,SWBHST,label='Jul-Dec')
-plt.title('Solar Wind Bz PDF')
-plt.xlabel('Solar Wind Bz (nT) (stride = '+ str(stride) + ' nT)')
+plt.title('Solar Wind Bz_GSE PDF')
+plt.xlabel('Solar Wind Bz_GSE (nT) (stride = '+ str(stride) + ' nT)')
 plt.ylabel('Number of Occurance')
 plt.legend()
 
@@ -139,21 +155,5 @@ plt.suptitle('OMNI Hourly Data for 2014')
 plt.show()
 
 
-
 sys.exit()
 
-
-
-
-
-#HUR = cdfData['HR']
-#cdfDates=[0 for i in range((len(cdfData['YR'])))]
-#cdfDates=list(range(len(cdfData['YR'])))
-#for i in range(len(cdfData['YR'])):
-# d = datetime.date(int(cdfData['YR'][i]),1,1) + datetime.timedelta(days=int(cdfData['Day'][i]-1))
-# t = datetime.time(int(cdfData['HR'][i]))
-# cdfDates[i] = datetime.combine(d,t)
-#print datetime.combine(d,t), type(datetime.combine(d,t))
-#print cdfDates[i]
-#plt.plot(HUR,SWV)
-#plt.show()

@@ -69,3 +69,13 @@ def getOMNIfiles(omniDates,dataLoc,omniSet='hourly'):
 
     return sorted(fnames)
 
+
+def dataClean(oldList,threshold):
+    newList = []
+    for i in oldList:
+     if i <= threshold:
+      newList.extend([i]) 
+     else:
+      newList.extend([float('nan')]) 
+    return newList
+
