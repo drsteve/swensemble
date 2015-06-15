@@ -12,9 +12,9 @@ import spacepy.time as spt
 import matplotlib.pyplot as plt
 from getswdata import getOMNIfiles
 
-OMNIfnames = getOMNIfiles(2012,'/home/ehab/SWData','hourly')
-print OMNIfnames[0]
-print OMNIfnames[1]
+OMNIfnames = getOMNIfiles(['2002/06','2002/07','2004'],'/home/ehab/SWData','5min')
+for i in OMNIfnames:
+ print i
 sys.exit()
 
 cdf = pycdf.CDF(OMNIfnames[0])
