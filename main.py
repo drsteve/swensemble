@@ -17,9 +17,9 @@ from scipy.integrate import simps, trapz
 from swdatanal import getDistrib, omniDataCorr
 from getswdata import getOMNIfiles, dataClean, dateShift, dateList
 
-startDate = datetime.datetime(2008,7,1)
-endDate   = datetime.datetime(2008,9,1 )
-refDate   = datetime.datetime(2014,7,1)
+startDate = datetime.datetime(2003,7,1)
+endDate   = datetime.datetime(2003,12,31)
+refDate   = datetime.datetime(2003,7,1)
 locDateList = dateList(startDate, endDate, shift = 'month')
 OMNIfnames = getOMNIfiles(locDateList,'/home/ehab/SWData','hourly')
 if refDate in locDateList:
@@ -36,34 +36,37 @@ cdf.close()
 epochs = []; SWP = []
 for i in range(len(OMNIfnames)): 
  epochs = epochs + list(cdfData[i]['Epoch'])
- SWP    = SWP + list(cdfData[i]['V'])
-SWP = dataClean(SWP,[2500],['>='])
-
-SWPDateRng, cepochs, KSVals, KSDist, aepochs = omniDataCorr(refDate, startDate, endDate, epochs, SWP, CorrTime = 'Day')
+ SWP    = SWP + list(cdfData[i]['N'])
+SWP = dataClean(SWP,[999.0,0.0],['>=','<'])
+#SWP = dataClean(SWP,[2500],['>='])
+stride = 10
+SWPDateRng, cepochs, KSVals, KSDist, aepochs = omniDataCorr(refDate, startDate, endDate, epochs, SWP, binStride = stride, CorrTime = 'Day')
 
 fig = plt.figure()
 ax = plt.subplot2grid((2,2), (0,0), colspan=2)
 plt.plot(cepochs,SWPDateRng)
-plt.title('Solar Wind Speed')
-plt.ylabel('Speed (km/s')
+plt.title('Solar Wind Density')
+plt.ylabel('Density (N/cc)')
 
 ax = plt.subplot2grid((2,2),(1, 0))
 plt.plot(aepochs,KSVals[:,0],label='KS-Stat')
 plt.plot(aepochs,KSVals[:,1],label='P-Value')
-plt.title('Kolmogorov-Smirnov test between Velocity Samples')
+plt.title('Kolmogorov-Smirnov test between Density Samples')
 plt.xlabel('Month')
 plt.ylabel('KS-Stat and P-Value')
-ax.set_yscale('log')
+plt.xticks(rotation='30')
+plt.legend(loc='best')
 
 ax = plt.subplot2grid((2,2),(1, 1))
 plt.plot(aepochs,KSDist[:,0],label='KS-Stat')
 plt.plot(aepochs,KSDist[:,1],label='P-Value')
-plt.title('Kolmogorov-Smirnov test between Velcotity Distributions')
+plt.title('Kolmogorov-Smirnov test between Density Distributions')
 plt.xlabel('Month')
 plt.ylabel('KS-Stat and P-Value')
+plt.xticks(rotation='30')
 plt.legend(loc='best')
 
-plt.suptitle('Compare the Velocity Daily Variation Relative to First Date')
+plt.suptitle('Compare the Density Daily Variation Relative to First Date (stride = ' + str(stride) + ')')
 plt.show()
 sys.exit()
 

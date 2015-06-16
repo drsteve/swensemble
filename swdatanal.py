@@ -35,8 +35,7 @@ def getDistrib(data, nbins=0, stride=0, bins=[], norm = False):
      return dist, bins
 
 
-#def omniDataCorr(refDate, startDate, endDate, SWPar, SWPCln, SWPCon, nhistbins, CorrTime = 'Day', dataType = 'hourly', testType = 'normal'):
-def omniDataCorr(refDate, startDate, endDate, epochs, SWP, CorrTime = 'Day'):
+def omniDataCorr(refDate, startDate, endDate, epochs, SWP, binStride, CorrTime = 'Day'):
     import numpy
     import bisect
     import datetime
@@ -45,17 +44,17 @@ def omniDataCorr(refDate, startDate, endDate, epochs, SWP, CorrTime = 'Day'):
 
     sEpochID  = bisect.bisect_left(epochs, startDate)
     eEpochID  = bisect.bisect_left(epochs, endDate)
-    cepochs    = epochs[sEpochID:eEpochID]
-    SWPDatRng = filter(lambda v: v==v, SWP[sEpochID:eEpochID])
-    _, bins = getDistrib(SWPDatRng, stride = 1, norm = False)
+    cepochs   = epochs[sEpochID:eEpochID]
+    SWPDatRng = SWP[sEpochID:eEpochID]
+    _, bins   = getDistrib(filter(lambda v: v==v, SWPDatRng), stride = binStride, norm = False)
 
     if CorrTime == 'Day':
      sEpoch = datetime.datetime(refDate.year,refDate.month,refDate.day, 0, 0)
      eEpoch = datetime.datetime(refDate.year,refDate.month,refDate.day,23,59)
      sEpochID = bisect.bisect_left(epochs, sEpoch)
      eEpochID = bisect.bisect_left(epochs, eEpoch)
-     SWPV01   = filter(lambda v: v==v, SWP[sEpochID:eEpochID])
-     SWPD01 = getDistrib(SWPV01, bins=bins, norm=False)
+     SWPV01   = SWP[sEpochID:eEpochID]
+     SWPD01   = getDistrib(filter(lambda v: v==v, SWPV01), bins=bins, norm=False)
      
      aepochs = []; KSVals = []; KSDist = []
      for i in range((endDate-startDate).days):
@@ -63,8 +62,8 @@ def omniDataCorr(refDate, startDate, endDate, epochs, SWP, CorrTime = 'Day'):
       sEpochID = bisect.bisect_left(epochs, dateShift(sEpoch,0,0,i,0,0,0))
       eEpochID = bisect.bisect_left(epochs, dateShift(eEpoch,0,0,i,0,0,0))
 
-      SWPV02 = filter(lambda v: v==v, SWP[sEpochID:eEpochID])
-      SWPD02 = getDistrib(SWPV02, bins=bins, norm=False)
+      SWPV02 = SWP[sEpochID:eEpochID]
+      SWPD02 = getDistrib(filter(lambda v: v==v, SWPV02), bins=bins, norm=False)
 
       KSVals = KSVals + [ks_2samp(SWPV01, SWPV02)]
       KSDist = KSDist + [ks_2samp(SWPD01, SWPD02)]
