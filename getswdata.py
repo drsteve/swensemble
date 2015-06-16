@@ -20,17 +20,25 @@ def getOMNIfiles(omniDates,dataLoc,omniSet='hourly'):
     fnames = []
 
     for i in range(len(omniDates)):
-     if len(omniDates[i]) <= 4:
-      omniYear = omniDates[i][:4]
-      omniDate = omniYear
-     elif len(omniDates[i]) > 4: 
-      omniYear  = omniDates[i][:4]
-      if omniSet == 'hourly' and int(omniDates[i][5:7]) <= 6:
-       omniDate = omniYear + "0101"
-      elif omniSet == 'hourly' and int(omniDates[i][5:7]) >= 7:
-       omniDate = omniYear + "0701"
-      else:
-       omniDate = omniYear + omniDates[i][5:7] + "01"
+     if i > 0:
+      if omniDates[i] == omniDates[i-1]:
+       continue
+      elif omniDates[i].year == omniDates[i-1].year:
+       if omniDates[i].month == omniDates[i-1].month:
+        continue
+       elif omniSet == 'hourly':
+        if omniDates[i].month <= 6 and omniDates[i-1].month <= 6:
+         continue
+        elif omniDates[i].month >= 7 and omniDates[i-1].month >= 7:
+         continue
+
+     omniYear = str(omniDates[i].year)
+     if omniSet == 'hourly' and omniDates[i].month <= 6:
+      omniDate = str(omniDates[i].year) + "0101"
+     elif omniSet == 'hourly' and omniDates[i].month >= 7:
+      omniDate = str(omniDates[i].year) + "0701"
+     else:
+      omniDate = str(omniDates[i].year) + "%02d" % (omniDates[i].month) + "01"
 
      if omniYear == omniDate:
       if omniSet=='hourly':
@@ -70,12 +78,56 @@ def getOMNIfiles(omniDates,dataLoc,omniSet='hourly'):
     return sorted(fnames)
 
 
-def dataClean(oldList,threshold):
-    newList = []
-    for i in oldList:
-     if i <= threshold:
-      newList.extend([i]) 
-     else:
-      newList.extend([float('nan')]) 
-    return newList
+def dataClean(myList,threshold,operand):
+    for i in range(len(myList)):
+     for j in range(len(threshold)):
+      if operand[j] == '>=':
+       if myList[i] >= threshold[j]:
+        myList[i] = float('nan')
+      elif operand[j] == '<=':
+       if myList[i] <= threshold[j]:
+        myList[i] = float('nan')
+      elif operand[j] == '==':
+       if myList[i] == threshold[j]:
+        myList[i] = float('nan')
+      elif operand[j] == '<':
+       if myList[i] < threshold[j]:
+        myList[i] = float('nan')
+      elif operand[j] == '>':
+       if myList[i] > threshold[j]:
+        myList[i] = float('nan')
+    return myList
 
+
+def dateShift(oldDate, years=0, months=0, days=0, hours=0, minutes=0, seconds=0):
+    from datetime import datetime, timedelta
+
+    month = oldDate.month - 1 + months
+    year = oldDate.year + month / 12 + years
+    month = month % 12 + 1
+    day = oldDate.day
+    hour = oldDate.hour
+    minute = oldDate.minute
+    second = oldDate.second
+    newDate = datetime(year,month,day,hour,minute,second) + timedelta(days=days,hours=hours,minutes=minutes,seconds=seconds)
+
+    return newDate
+
+
+def dateList(sDate, eDate, shift = 'day'):
+    dList = []
+    if shift == 'day':
+     diff = eDate - sDate
+     for i in range(diff.days + 1):
+      dList = dList + [dateShift(sDate, days = i)]
+    elif shift == 'month':
+     diff = eDate.month - sDate.month
+     for i in range(diff + 1):
+      dList = dList + [dateShift(sDate, months = i)]
+    elif shift == 'year':
+     diff = eDate.year - sDate.year
+     for i in range(diff + 1):
+      dList = dList + [dateShift(sDate, years = i)]
+
+    return dList 
+     
