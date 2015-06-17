@@ -35,29 +35,40 @@ def getDistrib(data, nbins=0, stride=0, bins=[], norm = False):
      return dist, bins
 
 
-def omniDataCorr(refDate, startDate, endDate, epochs, SWP, binStride, CorrTime = 'Day'):
+def omniDataCorr(srefDate, erefDate, startDate, endDate, epochs, SWP, binStride, CorrTime = 'Day'):
     import numpy
     import bisect
     import datetime
     from scipy.stats import ks_2samp
     from getswdata import getOMNIfiles, dataClean, dateShift, dateList
 
+    CorrTime = CorrTime.lower()
+
+    if endDate < startDate:
+     print('(swdatanal.omniDataCorr).Error: Dates are not applicable')
+     SWPDatRng=0; cepochs=0; KSVals=0; KSDist=0; aepochs=0
+     return SWPDatRng, cepochs, KSVals, KSDist, aepochs
+
     sEpochID  = bisect.bisect_left(epochs, startDate)
     eEpochID  = bisect.bisect_left(epochs, endDate)
     cepochs   = epochs[sEpochID:eEpochID]
     SWPDatRng = SWP[sEpochID:eEpochID]
+    if SWP[sEpochID:eEpochID] == []:
+     print('(swdatanal.omniDataCorr).Error: No data avaliable for the designated date(s) and/or time(s).')
+     SWPDatRng=0; cepochs=0; KSVals=0; KSDist=0; aepochs=0
+     return SWPDatRng, cepochs, KSVals, KSDist, aepochs
     _, bins   = getDistrib(filter(lambda v: v==v, SWPDatRng), stride = binStride, norm = False)
 
-    if CorrTime == 'Day':
-     sEpoch = datetime.datetime(refDate.year,refDate.month,refDate.day, 0, 0)
-     eEpoch = datetime.datetime(refDate.year,refDate.month,refDate.day,23,59)
-     sEpochID = bisect.bisect_left(epochs, sEpoch)
-     eEpochID = bisect.bisect_left(epochs, eEpoch)
-     SWPV01   = SWP[sEpochID:eEpochID]
-     SWPD01   = getDistrib(filter(lambda v: v==v, SWPV01), bins=bins, norm=False)
-     
+    sEpochID = bisect.bisect_left(epochs, srefDate)
+    eEpochID = bisect.bisect_left(epochs, erefDate)
+    SWPV01   = SWP[sEpochID:eEpochID]
+    SWPD01   = getDistrib(filter(lambda v: v==v, SWPV01), bins=bins, norm=False)
+
+    if CorrTime == 'day':
      aepochs = []; KSVals = []; KSDist = []
-     for i in range((endDate-startDate).days):
+     sEpoch = datetime.datetime(startDate.year,startDate.month,startDate.day, 0, 0, 0)
+     eEpoch = dateShift(sEpoch, hours = 23, minutes = 59, seconds = 59)
+     for i in range((endDate-startDate).days+1):
       aepochs  = aepochs + [dateShift(sEpoch,0,0,i,0,0,0)]
       sEpochID = bisect.bisect_left(epochs, dateShift(sEpoch,0,0,i,0,0,0))
       eEpochID = bisect.bisect_left(epochs, dateShift(eEpoch,0,0,i,0,0,0))

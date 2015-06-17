@@ -12,6 +12,8 @@ def getOMNIfiles(omniDates,dataLoc,omniSet='hourly'):
     import os
     import glob
 
+    omniSet = omniSet.lower()
+
     if dataLoc[len(dataLoc)-1] == "/":
      dataLoc = dataLoc[:len(dataLoc)]
     else:
@@ -115,19 +117,32 @@ def dateShift(oldDate, years=0, months=0, days=0, hours=0, minutes=0, seconds=0)
 
 
 def dateList(sDate, eDate, shift = 'day'):
+    shift = shift.lower()
     dList = []
-    if shift == 'day':
+    if shift == 'day' or shift == 'days':
      diff = eDate - sDate
      for i in range(diff.days + 1):
       dList = dList + [dateShift(sDate, days = i)]
-    elif shift == 'month':
+    elif shift == 'month' or shift == 'months':
      diff = eDate.month - sDate.month
      for i in range(diff + 1):
       dList = dList + [dateShift(sDate, months = i)]
-    elif shift == 'year':
+    elif shift == 'year' or shift == 'years':
      diff = eDate.year - sDate.year
      for i in range(diff + 1):
       dList = dList + [dateShift(sDate, years = i)]
+    elif shift == 'hour' or shift == 'hours':
+     diff = eDate - sDate
+     for i in range(diff.seconds / 3600 + 1):
+      dList = dList + [dateShift(sDate, hours = i)]
+    elif shift == 'minute' or shift == 'minutes':
+     diff = eDate - sDate
+     for i in range(diff.seconds / 60 + 1):
+      dList = dList + [dateShift(sDate, minutes = i)]
+    elif shift == 'second' or shift == 'seconds':
+     diff = eDate - sDate
+     for i in range(diff.seconds + 1):
+      dList = dList + [dateShift(sDate, seconds = i)]
 
     return dList 
      
