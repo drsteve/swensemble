@@ -18,11 +18,11 @@ from scipy.integrate import simps, trapz
 from swdatanal import getDistrib, omniDataCorr, getSolarWindType
 from getswdata import getOMNIfiles, dataClean, dateShift, dateList
 
-#omniRecTime = 'hourly'
-omniRecTime = '5min'
+omniRecTime = 'hourly'
+#omniRecTime = '1min'
 
-startDate   = datetime.datetime(2014, 1, 1, 0, 0, 0)
-endDate     = datetime.datetime(2014, 2,28,23,59,59)
+startDate   = datetime.datetime(2003, 1, 1, 0, 0, 0)
+endDate     = datetime.datetime(2003, 2,28,23,59,59)
 locDateList = dateList(startDate, endDate, shift = 'month')
 OMNIfnames  = getOMNIfiles(locDateList,'/home/ehab/SWData',omniRecTime)
 

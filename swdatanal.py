@@ -35,6 +35,12 @@ def getDistrib(data, nbins=0, stride=0, bins=[], norm = False):
      return dist, bins
 
 
+def getIndices(inList, item):
+    from numpy import isnan
+    indices = [i for i in range(len(inList)) if isnan(inList[i])]
+    return indices
+
+
 def omniDataCorr(srefDate, erefDate, startDate, endDate, epochs, SWP, binStride, CorrTime = 'Day', CorrType = 'kstest'):
     import numpy
     import bisect
@@ -93,7 +99,6 @@ def omniDataCorr(srefDate, erefDate, startDate, endDate, epochs, SWP, binStride,
 def getSolarWindType(SWPList):
     from  numpy import array, log10, dot, sign
     import scipy.constants
-    import matplotlib.pyplot as plt
 
     Tp = (scipy.constants.k*array(SWPList['T']))/scipy.constants.physical_constants['electron volt'][0]
     Sp = Tp/((array(SWPList['N']))**0.667)
@@ -104,29 +109,8 @@ def getSolarWindType(SWPList):
     dy = log10(VA)
     dz = log10(Tr)
 
-   #d1 = array([dx - 5.92, dy -  4.0, dz - 3.108]); d1 = d1.T
-   #d2 = array([dx - 6.08, dy -  4.0, dz - 0.760]); d2 = d2.T
-   #d3 = array([dx + 3.88, dy - 14.0, dz + 0.770]); d3 = d3.T
-
-   #n1 = array([  5.92,  4.0,   3.108])
-   #n2 = array([  6.08,  4.0,   0.760])
-   #n3 = array([- 3.88, 14.0, - 0.770])
-
     SWPClass = []
     for i in range(len(dx)):
-    #g1 = dot(d1[i], n1)
-    #g2 = dot(d2[i], n2)
-    #g3 = dot(d3[i], n3)
-
-    #if sign(g1) == 1:                                         # Ejecta
-    # SWPClass = SWPClass + ['EJT']
-    #elif sign(g1) == -1 and sign(g3) == 1:                    # Coronal-Hole_Origin
-    # SWPClass = SWPClass + ['CHO']
-    #elif sign(g1) == -1 and sign(g3) == -1:                   # Sector-Reversal-Region
-    # SWPClass = SWPClass + ['SRR']
-    #elif sign(g1) == -1 and sign(g2) == 1 and sign(g3) == -1: # Streamer-Belt-Origin
-    # SWPClass = SWPClass + ['SBO']
-
      if dy[i] > 0.277 * dx[i] +0.055 * dz[i] + 1.83:           # Ejecta
       SWPClass = SWPClass + ['EJT']
      elif dx[i] > -0.525 * dz[i] - 0.676 * dy[i] + 1.74:       # Coronal-Hole_Origin
