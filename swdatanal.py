@@ -1,3 +1,82 @@
+def findContiguousData(x, delta, minLength=None):
+    """Find all intervals of contiguous data in x exceeding min_length
+
+    Contiguous data are defined as neighbouring points separated by delta
+    i.e., x[i+1] - x[i] = delta
+
+    If min_length is undefined then min_length = Delta
+    
+    Inputs:
+    =======
+    x, input series of times. Can be datetime objects or serial time
+    delta, expected resolution of x.
+    minLength [defaults to delta], minimum length of contiguous interval required.
+    
+    Returns:
+    ========
+    istart, iend - indices of starts and ends of contiguous blocks
+    
+    Author:
+    =======
+    Original -- Mervyn Freeman, British Antarctic Survey
+    Port to Python by Steve Morley, Los Alamos National Lab.
+    smorley@lanl.gov/morley_steve@hotmail.com
+    """
+
+    if not minLength:
+        minLength = delta
+
+    if type(x)==list:
+        x = np.array(x)
+    #now ensure type consistency of array contents for datetime input
+    if isinstance(x[0], dt.datetime):
+        try:
+            assert type(delta) == type(minLength)
+            assert isinstance(delta, dt.timedelta)
+        except:
+            return 'findContiguousData: inconsistent data types for time objects'
+
+    #Calculate distance between neighbouring data points in array x
+    dx = x[1:]-x[0:-1]
+
+    #Find positions i where X neighbours are non-contiguous
+    #i.e., X(i+1) - X(i) > Delta
+    #Store in array igaps
+    igaps, = (dx > delta).nonzero()
+    igaps1, nigaps = igaps+1, len(igaps)
+
+    #Now find intervals of contiguous data exceeding min_length
+    #Contiguous data interval starts at the end of a non-contiguous interval
+    #and ends at the start of the next non-contiguous interval.
+
+    #Start of series X is start of first potentially contiguous interval
+    istart_c = [0]
+    #Find starts of other potentially contiguous intervals
+    #from ends of non-contiguous intervals
+    end_nc = x[igaps+1].tolist()
+    start_c = end_nc
+    istart_c = igaps1.tolist()
+    start_c.insert(0, x[0])
+    istart_c.insert(0, 0)
+    #Find ends of potentially contiguous intervals
+    #from starts of non-contiguous intervals
+    end_c = x[igaps].tolist() #start_nc
+    iend_c = igaps.tolist()
+    #Add end of series X as end of last potentially contiguous interval
+    end_c.append(x[-1])
+    iend_c.append(len(x)-1)
+
+    #Find lengths of all potentially contiguous intervals
+    length = [cEnd - start_c[i] for i, cEnd in enumerate(end_c)]
+    #Find those whose length exceeds min_length
+    ilong, = (np.array(length) > minLength).nonzero()
+
+    #Return start and end indices of these intervals
+    istart = [istart_c[ind] for ind in ilong]
+    iend = [iend_c[ind] for ind in ilong]
+
+    return istart, iend
+
 
 def getDistrib(data, nbins=0, stride=0, bins=[], norm = False):
     from scipy.stats import histogram, histogram2
@@ -121,4 +200,53 @@ def getSolarWindType(SWPList):
       SWPClass = SWPClass + ['SBO']
 
     return list(Sp), list(Tr), list(VA), SWPClass
+
+
+def getTimeLag(srcData,destPos,method='standard'):
+    from math import atan2, tan, degrees, radians
+    from datetime import timedelta
+
+    method = method.lower()
+    propgLag=[]
+    epochLag=[]
+    if method == 'standard':
+     for i in range(len(srcData['plasmaEpoch'])):
+      alpha   = atan2(srcData['Bx'][i],srcData['By'][i])
+      timeLag = srcData['SCxGSE'][i]-destPos['X']
+     #timeLag = timeLag + (srcData['SCyGSE'][i] - destPos['Y']) * tan(alpha)
+      timeLag = timeLag/srcData['Vx'][i]
+     #print 'timeLag = ',timeLag, ', ACE_y = ', srcData['SCyGSE'][i], ', IMP_y = ', destPos['Y'], ', tan(B_x/B_y) = ', degrees(alpha)
+      propgLag.extend([abs(timeLag)])
+      epochLag.extend([srcData['plasmaEpoch'][i] + timedelta(0,propgLag[i])])
+    return propgLag, epochLag
+
+
+def swMedFilter(swEpoch,swParam,nSeconds):
+    from scipy.signal import medfilt
+    from getswdata import dateShift
+
+    epochDiff = swEpoch[-1] - swEpoch[0]
+    epochSize = epochDiff.days*(24*60*60) + epochDiff.seconds
+    if epochSize < nSeconds:
+     print 'Epoch size is too small'
+     return ""
+
+    eFilter = epochSize/nSeconds
+    if eFilter%2 == 0: eFilter = eFilter + 1
+    swParamMF = medfilt(swParam,eFilter)
  
+    return swParamMF
+
+
+def ccorr(x, y):
+    from numpy.fft import fft, ifft
+    """Periodic correlation, implemented using the FFT.
+       x and y must be real sequences with the same length.
+    """
+    xyccorr = ifft(fft(x) * fft(y).conj())
+    xyccorr = xyccorr/max(abs(xyccorr))
+    return xyccorr
+
+
+
+
