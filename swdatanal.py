@@ -205,19 +205,21 @@ def getSolarWindType(SWPList):
 def getTimeLag(srcData,destPos,method='standard'):
     from math import atan2, tan, degrees, radians
     from datetime import timedelta
+    from numpy import arange
 
     method = method.lower()
     propgLag=[]
     epochLag=[]
     if method == 'standard':
-     for i in range(len(srcData['plasmaEpoch'])):
+     for i in range(len(srcData['epoch'])):
       alpha   = atan2(srcData['Bx'][i],srcData['By'][i])
-      timeLag = srcData['SCxGSE'][i]-destPos['X']
-     #timeLag = timeLag + (srcData['SCyGSE'][i] - destPos['Y']) * tan(alpha)
+      timeLag = srcData['SCxGSE'][i]-destPos['X'][i]
+      if (degrees(alpha) <= 89.9 and degrees(alpha) >= -89.9) or (degrees(alpha) > 91.1 and degrees(alpha) < 269.9):
+       timeLag = timeLag + (srcData['SCyGSE'][i] - destPos['Y'][i]) * tan(alpha)
+     # print 'timeLag = ',timeLag, ', ACE_y = ', srcData['SCyGSE'][i], ', IMP_y = ', destPos['Y'][i], ', tan(B_x/B_y) = ', degrees(alpha)
       timeLag = timeLag/srcData['Vx'][i]
-     #print 'timeLag = ',timeLag, ', ACE_y = ', srcData['SCyGSE'][i], ', IMP_y = ', destPos['Y'], ', tan(B_x/B_y) = ', degrees(alpha)
       propgLag.extend([abs(timeLag)])
-      epochLag.extend([srcData['plasmaEpoch'][i] + timedelta(0,propgLag[i])])
+      epochLag.extend([srcData['epoch'][i] + timedelta(0,propgLag[i])])
     return propgLag, epochLag
 
 
@@ -240,13 +242,78 @@ def swMedFilter(swEpoch,swParam,nSeconds):
 
 def ccorr(x, y):
     from numpy.fft import fft, ifft
+    from numpy     import argmax
     """Periodic correlation, implemented using the FFT.
        x and y must be real sequences with the same length.
     """
     xyccorr = ifft(fft(x) * fft(y).conj())
     xyccorr = xyccorr/max(abs(xyccorr))
-    return xyccorr
+    return xyccorr, argmax(abs(xyccorr))
 
 
+def acorr(x,y):
+    from numpy import correlate, array, argmax, arange, linspace
+    from scipy import signal
+    if len(x) < len(y):
+     print('Length of first vector must be greater than or equal length of second vector')
+     return ''
+    else:
+     scorr=signal.correlate(x,y,'full')
+    #scorr=correlate(x,y,'full')
+
+     nsamples = x.size
+     dt = arange(1-x.size, x.size)
+     scorrLag = dt[scorr.argmax()]
+     return scorr, scorrLag
+    
+def xcorr(x, y, k, normalize=True):
+    import numpy as np
+    n = x.shape[0]
+
+    # initialize the output array
+    out = np.empty((2 * k) + 1, dtype=np.double)
+    lags = np.arange(-k, k + 1)
+
+    # pre-compute E(x), E(y)
+    mu_x = x.mean()
+    mu_y = y.mean()
+
+    # loop over lags
+    for ii, lag in enumerate(lags):
+
+        # use slice indexing to get 'shifted' views of the two input signals
+        if lag < 0:
+            xi = x[:lag]
+            yi = y[-lag:]
+        elif lag > 0:
+            xi = x[:-lag]
+            yi = y[lag:]
+        else:
+            xi = x
+            yi = y
+
+        # x - mu_x; y - mu_y
+        xdiff = xi - mu_x
+        ydiff = yi - mu_y
+
+        # E[(x - mu_x) * (y - mu_y)]
+        out[ii] = xdiff.dot(ydiff) / n
+
+        # NB: xdiff.dot(ydiff) == (xdiff * ydiff).sum()
+
+    if normalize:
+        # E[(x - mu_x) * (y - mu_y)] / (sigma_x * sigma_y)
+        out /=  np.std(x) * np.std(y)
+
+    return lags, out
+
+
+def kdeBW(obj, fac=1./5):
+    from numpy import power
+    """
+       We use Scott's Rule, multiplied by a constant factor 
+       to calculate the KDE Bandwidth.
+    """
+    return power(obj.n, -1./(obj.d+4)) * fac
 
 

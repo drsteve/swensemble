@@ -19,9 +19,9 @@ from scipy.signal import medfilt
 from mpl_toolkits.mplot3d import Axes3D
 
 from scipy.integrate import simps, trapz
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, gaussian_kde
 
-from swdatanal import getDistrib, getIndices, omniDataCorr, ccorr
+from swdatanal import getDistrib, getIndices, omniDataCorr, ccorr, kdeBW
 from swdatanal import getSolarWindType, getTimeLag, swMedFilter
 from getswdata import getOMNIfiles, getOMNIdata, getOMNIparams
 from getswdata import getACEfiles, getACEdata, getACEparams, aceDataAdjust
@@ -31,9 +31,17 @@ from getswdata import getGeotailfiles,getGeotaildata, getGeotailparams
 from getswdata import dataClean, dateShift, dateList, epochMatch, removeNaN
 
 
-startDate   = datetime.datetime(1999, 1,15,13, 0, 0)
-endDate     = datetime.datetime(1999, 1,15,21,59,59)
+startDate   = datetime.datetime(1999, 7,21, 0, 0, 0)
+endDate     = datetime.datetime(1999, 7,28, 0, 0, 0)
 locDateList = dateList(startDate, endDate, shift = 'hour')
+
+iCounter = 0
+sTime = []; eTime = []
+while 1:
+ sTime.extend([dateShift(startDate, hours=iCounter*6)])
+ eTime.extend([dateShift(startDate, hours=(iCounter+1)*6)])
+ if eTime[iCounter] >= endDate: break
+ iCounter = iCounter + 1
 
 dataSRC = ""
 swCats = False
@@ -89,19 +97,7 @@ if dataSRC == 'imp8':
   RE = 6371.0
   swParams = ['B_Vector_GSE','proton_density_fit','V_fit','protonV_thermal_fit','SC_Pos_GSE','SC_Pos_GSM']
   imp8Data = getIMP8data(locDateList,'/home/ehab/SWData',swParams,imp8Set='15sec',dataStat='clean')
-  imp8Data['N']   = numpy.array(imp8Data['proton_density_fit'])
-  imp8Data['V']   = numpy.array(imp8Data['V_fit'])
-  imp8Data['T']   = numpy.array(imp8Data['protonV_thermal_fit'])
-  imp8Data['Bx']  = numpy.array(imp8Data['B_Vector_GSE'][0])
-  imp8Data['By']  = numpy.array(imp8Data['B_Vector_GSE'][1])
-  imp8Data['Bz']  = numpy.array(imp8Data['B_Vector_GSE'][2])
-  BB = []
-  for i in range(len(imp8Data['Bx'])):
-   BB.extend([math.sqrt(imp8Data['Bx'][i]**2+imp8Data['By'][i]**2+imp8Data['Bz'][i]**2)])
-  imp8Data['B']   = BB
-  imp8Data['SCxGSE'] = numpy.array(imp8Data['SC_Pos_GSE'][0])*RE
-  imp8Data['SCyGSE'] = numpy.array(imp8Data['SC_Pos_GSE'][1])*RE
-  imp8Data['SCzGSE'] = numpy.array(imp8Data['SC_Pos_GSE'][2])*RE
+  imp8Data = imp8DataAdjust(imp8Data)
 
 dataSRC = 'ace'
 if dataSRC == 'ace':
@@ -110,22 +106,10 @@ if dataSRC == 'ace':
  if aceParams != '--empty--':
   swParams = ['Magnitude','Np','Vp','Tpr','BGSEc','V_GSE','SC_pos_GSE']
   aceData  = getACEdata(locDateList,'/home/ehab/SWData',swParams,['16sec','1min'],dataStat='clean')
-  aceData['B']   = numpy.array(aceData['Magnitude'])
-  aceData['N']   = numpy.array(aceData['Np'])
-  aceData['V']   = numpy.array(aceData['Vp'])
-  aceData['T']   = numpy.array(aceData['Tpr'])
-  aceData['Bx']  = numpy.array(aceData['BGSEc'][0])
-  aceData['By']  = numpy.array(aceData['BGSEc'][1])
-  aceData['Bz']  = numpy.array(aceData['BGSEc'][2])
-  aceData['Vx']  = numpy.array(aceData['V_GSE'][0])
-  aceData['Vy']  = numpy.array(aceData['V_GSE'][1])
-  aceData['Vz']  = numpy.array(aceData['V_GSE'][2])
-  aceData['SCxGSE'] = numpy.array(aceData['SC_pos_GSE'][0])
-  aceData['SCyGSE'] = numpy.array(aceData['SC_pos_GSE'][1])
-  aceData['SCzGSE'] = numpy.array(aceData['SC_pos_GSE'][2])
+  aceData  = aceDataAdjust(aceData)
 
   if swCats:
-   swCatParams = {'V':aceData['Vp'], 'T':aceData['Tpr'], 'N':aceData['Np'], 'B':aceData['Magnitude']}
+   swCatParams = {'V':aceData['V'], 'T':aceData['T'], 'N':aceData['N'], 'B':aceData['B']}
    _, _, _, SWClass = getSolarWindType(swCatParams)
    aceVEJT=[];aceVCHO=[];aceVSRR=[];aceVSBO=[]
    aceNEJT=[];aceNCHO=[];aceNSRR=[];aceNSBO=[]
@@ -246,20 +230,189 @@ if dataSRC == 'omni':
    plt.title('OMNI Data Solar Wind Categorization')
    plt.show()
 
-aceDataAdjust(aceData,aceData['plasmaEpoch'],epochLen='fixed')
-imp8DataAdjust(imp8Data,imp8Data['plasmaEpoch'],epochLen='fixed')
+#plt.figure(1)
+#plt.plot(imp8Data['magneticEpoch'],imp8Data['SCxGSE'])
+#plt.show()
+
+for i in range(len(sTime)):
+ sEpochBIDI  = bisect.bisect_left(imp8Data['magneticEpoch'], sTime[i])
+ eEpochBIDI  = bisect.bisect_left(imp8Data['magneticEpoch'], eTime[i])
+ sEpochPIDI  = bisect.bisect_left(imp8Data['plasmaEpoch'], sTime[i])
+ eEpochPIDI  = bisect.bisect_left(imp8Data['plasmaEpoch'], eTime[i])
+ impPEpoch   = imp8Data['plasmaEpoch'][sEpochPIDI:eEpochPIDI]
+ impBEpoch   = imp8Data['magneticEpoch'][sEpochBIDI:eEpochBIDI]
+ 
+ sEpochBIDA  = bisect.bisect_left(aceData['magneticEpoch'], sTime[i])
+ eEpochBIDA  = bisect.bisect_left(aceData['magneticEpoch'], eTime[i])
+ sEpochPIDA  = bisect.bisect_left(aceData['plasmaEpoch'], sTime[i])
+ eEpochPIDA  = bisect.bisect_left(aceData['plasmaEpoch'], eTime[i])
+ acePEpoch   = aceData['plasmaEpoch'][sEpochPIDA:eEpochPIDA]
+ aceBEpoch   = aceData['magneticEpoch'][sEpochBIDA:eEpochBIDA]
+ 
+ TT,VV = removeNaN(acePEpoch,aceData['V'][sEpochPIDA:eEpochPIDA])
+ aceVmod=epochMatch(impPEpoch,TT,VV)
+ TT,VV = removeNaN(impPEpoch,imp8Data['V'][sEpochPIDI:eEpochPIDI])
+ impVmod=epochMatch(impPEpoch,TT,VV)
+
+#TT,BB = removeNaN(aceBEpoch,aceData['Bx'][sEpochPIDA:eEpochPIDA])
+#aceBxmod=epochMatch(impPEpoch,TT,BB)
+#TT,BB = removeNaN(impPEpoch,imp8Data['Bx'][sEpochPIDI:eEpochPIDI])
+#impBxmod=epochMatch(impPEpoch,TT,BB)
+
+#TT,BB = removeNaN(aceBEpoch,aceData['By'][sEpochPIDA:eEpochPIDA])
+#aceBymod=epochMatch(impPEpoch,TT,BB)
+#TT,BB = removeNaN(impPEpoch,imp8Data['By'][sEpochPIDI:eEpochPIDI])
+#impBymod=epochMatch(impPEpoch,TT,BB)
+
+#TT,BB = removeNaN(aceBEpoch,aceData['Bz'][sEpochPIDA:eEpochPIDA])
+#aceBzmod=epochMatch(impPEpoch,TT,BB)
+#TT,BB = removeNaN(impPEpoch,imp8Data['Bz'][sEpochPIDI:eEpochPIDI])
+#impBzmod=epochMatch(impPEpoch,TT,BB)
+
+#TT,VV = removeNaN(acePEpoch,aceData['Vx'])
+#aceVxmod=epochMatch(imp8Data['plasmaEpoch'][sEpochPIDI:eEpochPIDI],TT,VV)
+
+#TT,NN  = removeNaN(acePEpoch,aceData['N'][sEpochPIDA:eEpochPIDA])
+#aceNmod=epochMatch(impPEpoch,TT,NN)
+#TT,NN = removeNaN(impPEpoch,imp8Data['N'][sEpochPIDI:eEpochPIDI])
+#impNmod=epochMatch(impPEpoch,TT,NN)
+
+ plt.figure(100)
+
+ plt.subplot(4,1,1)
+ plt.plot(impPEpoch,impVmod)
+ plt.plot(impPEpoch,aceVmod)
+
+#plt.subplot(4,1,2)
+#plt.plot(impPEpoch,impNmod)
+#plt.plot(impPEpoch,aceNmod)
+
+#plt.subplot(4,1,3)
+#plt.plot(impPEpoch,impBzmod)
+#plt.plot(impPEpoch,aceBzmod)
+
+#plt.subplot(4,1,4)
+#plt.plot(impPEpoch,aceVxmod)
+
+ plt.show()
 sys.exit()
 
-TT,VV = removeNaN(aceData['plasmaEpoch'],aceData['V'])
-aceVmod=epochMatch(imp8Data['plasmaEpoch'],TT,VV)
-TT,BB = removeNaN(aceData['magneticEpoch'],aceData['Bz'])
-aceBzmod=epochMatch(imp8Data['plasmaEpoch'],TT,BB)
+aceXmod=epochMatch(imp8Data['plasmaEpoch'],aceData['magneticEpoch'],aceData['SCxGSE'])
+impXmod=epochMatch(imp8Data['plasmaEpoch'],imp8Data['magneticEpoch'],imp8Data['SCxGSE'])
+
+aceYmod=epochMatch(imp8Data['plasmaEpoch'],aceData['magneticEpoch'],aceData['SCyGSE'])
+impYmod=epochMatch(imp8Data['plasmaEpoch'],imp8Data['magneticEpoch'],imp8Data['SCyGSE'])
+
+aceZmod=epochMatch(imp8Data['plasmaEpoch'],aceData['magneticEpoch'],aceData['SCzGSE'])
+impZmod=epochMatch(imp8Data['plasmaEpoch'],imp8Data['magneticEpoch'],imp8Data['SCzGSE'])
+
+imp8DataMD = {'epoch':imp8Data['plasmaEpoch']}
+imp8DataMD['V'] = swMedFilter(imp8DataMD['epoch'],impVmod,45*60)
+imp8DataMD['N'] = swMedFilter(imp8DataMD['epoch'],impNmod,45*60)
+imp8DataMD['Bz'] = swMedFilter(imp8DataMD['epoch'],impBzmod,45*60)
+imp8DataMD['SCxGSE'] = impXmod
+imp8DataMD['SCyGSE'] = impYmod
+imp8DataMD['SCzGSE'] = impZmod
+
+aceDataMD = {'epoch':imp8Data['plasmaEpoch']}
+aceDataMD['V'] = swMedFilter(aceDataMD['epoch'],aceVmod,45*60)
+aceDataMD['Vx'] = swMedFilter(aceDataMD['epoch'],aceVxmod,45*60)
+aceDataMD['N'] = swMedFilter(aceDataMD['epoch'],aceNmod,45*60)
+aceDataMD['Bx'] = swMedFilter(aceDataMD['epoch'],aceBxmod,45*60)
+aceDataMD['By'] = swMedFilter(aceDataMD['epoch'],aceBymod,45*60)
+aceDataMD['Bz'] = swMedFilter(aceDataMD['epoch'],aceBzmod,45*60)
+aceDataMD['SCxGSE'] = aceXmod
+aceDataMD['SCyGSE'] = aceYmod
+aceDataMD['SCzGSE'] = aceZmod
+
+RE = 6371.0
+plt.figure(200)
 plt.subplot(3,1,1)
-plt.plot(imp8Data['plasmaEpoch'],aceBzmod)
+plt.plot(imp8DataMD['epoch'],impXmod/RE,label='IMP8')
+plt.plot(aceDataMD['epoch'],aceXmod/RE,label='ACE')
+plt.ylabel('X-Position ($R_E$)')
+plt.title('ACE and IMP8 Location')
+plt.legend(loc='best')
 plt.subplot(3,1,2)
-plt.plot(imp8Data['plasmaEpoch'],aceVmod)
+plt.plot(imp8DataMD['epoch'],impYmod/RE,label='Imp8')
+plt.plot(aceDataMD['epoch'],aceYmod/RE,label='ACE')
+plt.ylabel('Y-Position ($R_E$)')
+plt.legend(loc='best')
 plt.subplot(3,1,3)
-plt.plot(aceData['magneticEpoch'],aceData['Bz'])
+plt.plot(imp8DataMD['epoch'],impZmod/RE,label='IMP8')
+plt.plot(aceDataMD['epoch'],aceZmod/RE,label='ACE')
+plt.ylabel('Z-Position ($R_E$)')
+plt.xlabel('Epoch Time')
+plt.legend(loc='best')
+
+destPos = {'X':impXmod,'Y':impYmod,'Z':impZmod}
+lagging, corEpoch = getTimeLag(aceDataMD,destPos,method='standard')
+lagging = dataClean(lagging,[1e-12],['<='])
+
+sEpoch1ID  = bisect.bisect_left(imp8DataMD['epoch'], corEpoch[0])
+eEpoch1ID  = bisect.bisect_left(imp8DataMD['epoch'],imp8DataMD['epoch'][-1])
+sEpoch2ID  = 0
+eEpoch2ID  = eEpoch1ID-sEpoch1ID
+
+plt.figure(300)
+plt.subplot(4,1,1)
+plt.plot(imp8DataMD['epoch'][sEpoch1ID:eEpoch1ID],imp8DataMD['V'][sEpoch1ID:eEpoch1ID],label='IMP8')
+plt.plot(aceDataMD['epoch'][sEpoch1ID:eEpoch1ID],aceDataMD['V'][sEpoch1ID:eEpoch1ID],label='ACE')
+plt.plot(corEpoch[sEpoch2ID:eEpoch2ID],aceDataMD['V'][sEpoch2ID:eEpoch2ID],label='propagated ACE')
+plt.legend(loc='best')
+plt.ylabel('Solar Wind Speed (km/s)')
+plt.title('Solar Wind - Time Lag')
+plt.subplot(4,1,2)
+plt.plot(imp8DataMD['epoch'][sEpoch1ID:eEpoch1ID],imp8DataMD['N'][sEpoch1ID:eEpoch1ID],label='IMP8')
+plt.plot( aceDataMD['epoch'][sEpoch1ID:eEpoch1ID], aceDataMD['N'][sEpoch1ID:eEpoch1ID],label='ACE')
+plt.plot(corEpoch[sEpoch2ID:eEpoch2ID],aceDataMD['N'][sEpoch2ID:eEpoch2ID],label='propagated ACE')
+plt.legend(loc='best')
+plt.ylabel('Solar Wind Density (N/cc)')
+plt.subplot(4,1,3)
+plt.plot(imp8DataMD['epoch'][sEpoch1ID:eEpoch1ID],imp8DataMD['Bz'][sEpoch1ID:eEpoch1ID],label='IMP8')
+plt.plot( aceDataMD['epoch'][sEpoch1ID:eEpoch1ID], aceDataMD['Bz'][sEpoch1ID:eEpoch1ID],label='ACE')
+plt.plot(corEpoch[sEpoch2ID:eEpoch2ID],aceDataMD['Bz'][sEpoch2ID:eEpoch2ID],label='propagated ACE')
+plt.legend(loc='best')
+plt.ylabel('$B_z$ (nT)')
+plt.subplot(4,1,4)
+plt.plot( aceDataMD['epoch'][sEpoch1ID:eEpoch1ID], aceDataMD['Vx'][sEpoch1ID:eEpoch1ID],label='ACE')
+plt.plot(corEpoch[sEpoch2ID:eEpoch2ID],aceDataMD['Vx'][sEpoch2ID:eEpoch2ID],label='propagated ACE')
+plt.legend(loc='best')
+plt.ylabel('$V_x$ (Km/s)')
+plt.xlabel('Epoch')
+plt.suptitle('1999-01-15')
+
+plt.figure(400)
+plt.subplot(3,1,1)
+plt.plot(abs(ccorr(imp8DataMD['V'][sEpoch1ID:eEpoch1ID],aceDataMD['V'][sEpoch2ID:eEpoch2ID])))
+plt.ylabel('Velocity Correlation')
+plt.title('Correlation between Solar Wind Parameters at ACE (after lagging) and IMP8')
+plt.subplot(3,1,2)
+plt.plot(abs(ccorr(imp8DataMD['N'][sEpoch1ID:eEpoch1ID],aceDataMD['N'][sEpoch2ID:eEpoch2ID])))
+plt.ylabel('Density Correlation')
+plt.subplot(3,1,3)
+plt.plot(abs(ccorr(imp8DataMD['Bz'][sEpoch1ID:eEpoch1ID],aceDataMD['Bz'][sEpoch2ID:eEpoch2ID])))
+plt.ylabel('Bz Correlation')
+plt.xlabel('Index')
+
+plt.figure(500)
+plt.plot(corEpoch,lagging)
+plt.title('Time Lag between ACE and IMP8 as a function of Epoch time')
+plt.xlabel('Epoch')
+plt.ylabel('Time Lag (seconds)')
+
+aceKDE = gaussian_kde(aceDataMD['V'][sEpoch2ID:eEpoch2ID], bw_method=kdeBW)
+imp8KDE = gaussian_kde(imp8DataMD['V'][sEpoch1ID:eEpoch1ID], bw_method=kdeBW)
+v_eval = numpy.linspace(500, 610, num=110)
+
+plt.figure(600)
+plt.plot(v_eval, aceKDE(v_eval), 'b-', label="ACE-KDE")
+plt.plot(v_eval, imp8KDE(v_eval), 'r-', label="IMP8-KDE")
+plt.title('Kernel Density Estimation for Solar Wind Velocity at ACE and IMP8')
+plt.xlabel('Solar Wind Velocity (Km/s)')
+plt.ylabel('Kernel Density Estimation')
+plt.legend(loc='best')
+
 plt.show()
 sys.exit()
 

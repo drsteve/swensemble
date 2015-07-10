@@ -282,7 +282,7 @@ def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
     return swData
 
 
-def aceDataAdjust(Data,epoch,epochLen='not fixed'):
+def aceDataAdjust(Data,epoch=[],epochLen='not fixed'):
     import numpy
     if epochLen == 'fixed' and epoch == Data['plasmaEpoch']:
      DataAdj={'epoch':epoch}
@@ -308,13 +308,13 @@ def aceDataAdjust(Data,epoch,epochLen='not fixed'):
      DataAdj['SCxGSE'] = numpy.array(Data['SC_pos_GSE'][0])
      DataAdj['SCyGSE'] = numpy.array(Data['SC_pos_GSE'][1])
      DataAdj['SCzGSE'] = numpy.array(Data['SC_pos_GSE'][2])
-     DataAdj['N']      = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['N'],interpKind='cubic'))
+     DataAdj['N']      = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['Np'],interpKind='cubic'))
      DataAdj['V']      = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['Vp'],interpKind='cubic'))
      DataAdj['T']      = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['Tpr'],interpKind='cubic'))
      DataAdj['Vx']     = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['V_GSE'][0],interpKind='cubic'))
      DataAdj['Vy']     = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['V_GSE'][1],interpKind='cubic'))
      DataAdj['Vz']     = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['V_GSE'][2],interpKind='cubic'))
-    elif epochLen == 'fixed':
+    elif epochLen == 'fixed' and epoch != []:
      DataAdj={'epoch':epoch}
      DataAdj['B']      = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['Magnitude'],interpKind='cubic'))
      DataAdj['Bx']     = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['BGSEc'][0],interpKind='cubic'))
@@ -323,14 +323,14 @@ def aceDataAdjust(Data,epoch,epochLen='not fixed'):
      DataAdj['SCxGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_pos_GSE'][0],interpKind='cubic'))
      DataAdj['SCyGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_pos_GSE'][1],interpKind='cubic'))
      DataAdj['SCzGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_pos_GSE'][2],interpKind='cubic'))
-     DataAdj['N']      = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['N'],interpKind='cubic'))
+     DataAdj['N']      = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['Np'],interpKind='cubic'))
      DataAdj['V']      = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['Vp'],interpKind='cubic'))
      DataAdj['T']      = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['Tpr'],interpKind='cubic'))
      DataAdj['Vx']     = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['V_GSE'][0],interpKind='cubic'))
      DataAdj['Vy']     = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['V_GSE'][1],interpKind='cubic'))
      DataAdj['Vz']     = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['V_GSE'][2],interpKind='cubic'))
     else:
-     DataAdj={'plasmaEpoch':Data['plasmaEpoch'],'magnetEpoch':Data['magneticEpoch']}
+     DataAdj={'plasmaEpoch':Data['plasmaEpoch'],'magneticEpoch':Data['magneticEpoch']}
      DataAdj['B']      = numpy.array(Data['Magnitude'])
      DataAdj['Bx']     = numpy.array(Data['BGSEc'][0])
      DataAdj['By']     = numpy.array(Data['BGSEc'][1])
@@ -494,10 +494,11 @@ def getIMP8data(imp8Dates,dataLoc,dataList,imp8Set='15sec',dataStat='raw'):
     return swData
 
 
-def imp8DataAdjust(Data,epoch,epochLen='not fixed'):
+def imp8DataAdjust(Data,epoch=[],epochLen='not fixed'):
     import numpy
     import math
     BB = []
+    RE = 6371.0
     if epochLen == 'fixed' and epoch == Data['plasmaEpoch']:
      DataAdj={'epoch':epoch}
      DataAdj['Bx']     = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['B_Vector_GSE'][0],interpKind='cubic'))
@@ -506,9 +507,9 @@ def imp8DataAdjust(Data,epoch,epochLen='not fixed'):
      for i in range(len(DataAdj['Bx'])):
       BB.extend([math.sqrt(DataAdj['Bx'][i]**2+DataAdj['By'][i]**2+DataAdj['Bz'][i]**2)])
      DataAdj['B']   = BB
-     DataAdj['SCxGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][0],interpKind='cubic'))
-     DataAdj['SCyGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][1],interpKind='cubic'))
-     DataAdj['SCzGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][2],interpKind='cubic'))
+     DataAdj['SCxGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][0],interpKind='cubic'))*RE
+     DataAdj['SCyGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][1],interpKind='cubic'))*RE
+     DataAdj['SCzGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][2],interpKind='cubic'))*RE
      DataAdj['N']      = numpy.array(Data['proton_density_fit'])
      DataAdj['V']      = numpy.array(Data['V_fit'])
      DataAdj['T']      = numpy.array(Data['protonV_thermal_fit'])
@@ -518,39 +519,39 @@ def imp8DataAdjust(Data,epoch,epochLen='not fixed'):
      DataAdj['By']     = numpy.array(Data['B_Vector_GSE'][1])
      DataAdj['Bz']     = numpy.array(Data['B_Vector_GSE'][2])
      for i in range(len(DataAdj['Bx'])):
-      BB.extend([math.sqrt(DataAdj['Bx'][i]**2+DataAdj['By'][i]**2+AdjData['Bz'][i]**2)])
+      BB.extend([math.sqrt(DataAdj['Bx'][i]**2+DataAdj['By'][i]**2+DataAdj['Bz'][i]**2)])
      DataAdj['B']   = BB
-     DataAdj['SCxGSE'] = numpy.array(Data['SC_Pos_GSE'][0])
-     DataAdj['SCyGSE'] = numpy.array(Data['SC_Pos_GSE'][1])
-     DataAdj['SCzGSE'] = numpy.array(Data['SC_Pos_GSE'][2])
+     DataAdj['SCxGSE'] = numpy.array(Data['SC_Pos_GSE'][0])*RE
+     DataAdj['SCyGSE'] = numpy.array(Data['SC_Pos_GSE'][1])*RE
+     DataAdj['SCzGSE'] = numpy.array(Data['SC_Pos_GSE'][2])*RE
      DataAdj['N']      = numpy.array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],Data['proton_density_fit'],interpKind='cubic'))
      DataAdj['V']      = numpy.array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],Data['V_fit'],interpKind='cubic'))
      DataAdj['T']      = numpy.array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],Data['protonV_thermal_fit'],interpKind='cubic'))
-    elif epochLen == 'fixed':
+    elif epochLen == 'fixed' and epoch != []:
      DataAdj={'epoch':epoch}
      DataAdj['Bx']     = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['B_Vector_GSE'][0],interpKind='cubic'))
      DataAdj['By']     = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['B_Vector_GSE'][1],interpKind='cubic'))
      DataAdj['Bz']     = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['B_Vector_GSE'][2],interpKind='cubic'))
      for i in range(len(DataAdj['Bx'])):
-      BB.extend([math.sqrt(DataAdj['Bx'][i]**2+DataAdj['By'][i]**2+AdjData['Bz'][i]**2)])
+      BB.extend([math.sqrt(DataAdj['Bx'][i]**2+DataAdj['By'][i]**2+DataAdj['Bz'][i]**2)])
      DataAdj['B']   = BB
-     DataAdj['SCxGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][0],interpKind='cubic'))
-     DataAdj['SCyGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][1],interpKind='cubic'))
-     DataAdj['SCzGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][2],interpKind='cubic'))
+     DataAdj['SCxGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][0],interpKind='cubic'))*RE
+     DataAdj['SCyGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][1],interpKind='cubic'))*RE
+     DataAdj['SCzGSE'] = numpy.array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][2],interpKind='cubic'))*RE
      DataAdj['N']      = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['proton_density_fit'],interpKind='cubic'))
      DataAdj['V']      = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['V_fit'],interpKind='cubic'))
      DataAdj['T']      = numpy.array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['protonV_thermal_fit'],interpKind='cubic'))
     else:
-     DataAdj={'plasmaEpoch':Data['plasmaEpoch'],'magnetEpoch':Data['magneticEpoch']}
+     DataAdj={'plasmaEpoch':Data['plasmaEpoch'],'magneticEpoch':Data['magneticEpoch']}
      DataAdj['Bx']     = numpy.array(Data['B_Vector_GSE'][0])
      DataAdj['By']     = numpy.array(Data['B_Vector_GSE'][1])
      DataAdj['Bz']     = numpy.array(Data['B_Vector_GSE'][2])
      for i in range(len(DataAdj['Bx'])):
-      BB.extend([math.sqrt(DataAdj['Bx'][i]**2+DataAdj['By'][i]**2+AdjData['Bz'][i]**2)])
+      BB.extend([math.sqrt(DataAdj['Bx'][i]**2+DataAdj['By'][i]**2+DataAdj['Bz'][i]**2)])
      DataAdj['B']   = BB
-     DataAdj['SCxGSE'] = numpy.array(Data['SC_Pos_GSE'][0])
-     DataAdj['SCyGSE'] = numpy.array(Data['SC_Pos_GSE'][1])
-     DataAdj['SCzGSE'] = numpy.array(Data['SC_Pos_GSE'][2])
+     DataAdj['SCxGSE'] = numpy.array(Data['SC_Pos_GSE'][0])*RE
+     DataAdj['SCyGSE'] = numpy.array(Data['SC_Pos_GSE'][1])*RE
+     DataAdj['SCzGSE'] = numpy.array(Data['SC_Pos_GSE'][2])*RE
      DataAdj['N']      = numpy.array(Data['proton_density_fit'])
      DataAdj['V']      = numpy.array(Data['V_fit'])
      DataAdj['T']      = numpy.array(Data['protonV_thermal_fit'])
