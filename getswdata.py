@@ -892,7 +892,8 @@ def epochMatch(refEpoch,epoch,data,interpKind='cubic'):
     for i in range(len(epoch)):
      epochStamp.extend([mktime(epoch[i].timetuple())])
 
-    f = interp1d(epochStamp, data, kind = interpKind)
+    f = interp1d(epochStamp, data, bounds_error=False, fill_value=0.0, kind = interpKind)
+   #f = interp1d(epochStamp, data, kind = interpKind)
 
     return f(refEpochStamp)
 

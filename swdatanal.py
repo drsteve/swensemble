@@ -1,4 +1,6 @@
 def findContiguousData(x, delta, minLength=None):
+    import numpy as np
+    import datetime as dt
     """Find all intervals of contiguous data in x exceeding min_length
 
     Contiguous data are defined as neighbouring points separated by delta
@@ -76,6 +78,53 @@ def findContiguousData(x, delta, minLength=None):
     iend = [iend_c[ind] for ind in ilong]
 
     return istart, iend
+
+def epochBlock(epoch, data, blockLen, gapLen, fixStep = True):
+    from numpy import diff
+    from datetime import timedelta
+    from bisect import bisect_left
+    from getswdata import removeNaN
+
+    if len(epoch) != len(data):
+     print '(epoch) length MUST equal (data) length.'
+     return ''
+
+    epochLength = epoch[-1] - epoch[0]
+    nHours = epochLength.days*24 + epochLength.seconds/3600
+    if nHours < blockLen:
+     print '(blockLen) is shorter than the available (data) block of time'
+     return ''
+
+    blockstart = []
+    cEpoch = epoch[0]
+    while cEpoch < epoch[-5]:
+     sEpochID  = bisect_left(epoch, cEpoch + timedelta(0,0))
+     eEpochID  = bisect_left(epoch, cEpoch + timedelta(0,(blockLen-1)*3600))
+     TT,DD = removeNaN(epoch[sEpochID:eEpochID],data[sEpochID:eEpochID])
+     if diff(TT) != []:
+      dt = max(diff(TT))
+      if dt.seconds <= gapLen:
+       blockstart.append(cEpoch)
+       cEpoch = cEpoch + timedelta(0,blockLen*3600)
+      else:
+       if fixStep:
+        cEpoch = cEpoch + timedelta(0,blockLen*3600)
+       else:
+        cEpoch = cEpoch + timedelta(0,3600)
+
+    return blockstart
+
+def findCorrEpoch(epoch1,epoch2):
+    from datetime import datetime, timedelta
+    from numpy import diff,array
+    cEpoch = []
+    for i in range(len(epoch1)):
+     epochDiff = abs(epoch1[i]-array(epoch2))
+     minDiff   = min(epochDiff)
+     if minDiff.seconds <= 900:
+      j = search(epochDiff, minDiff)[0]
+      cEpoch.extend([min(epoch1[i],epoch2[j])])
+    return cEpoch
 
 
 def getDistrib(data, nbins=0, stride=0, bins=[], norm = False):
@@ -205,23 +254,79 @@ def getSolarWindType(SWPList):
 def getTimeLag(srcData,destPos,method='standard'):
     from math import atan2, tan, degrees, radians
     from datetime import timedelta
-    from numpy import arange
+    from numpy import arange, isfinite
 
     method = method.lower()
     propgLag=[]
     epochLag=[]
     if method == 'standard':
      for i in range(len(srcData['epoch'])):
-      alpha   = atan2(srcData['Bx'][i],srcData['By'][i])
-      timeLag = srcData['SCxGSE'][i]-destPos['X'][i]
-      if (degrees(alpha) <= 89.9 and degrees(alpha) >= -89.9) or (degrees(alpha) > 91.1 and degrees(alpha) < 269.9):
-       timeLag = timeLag + (srcData['SCyGSE'][i] - destPos['Y'][i]) * tan(alpha)
+     #alpha   = atan2(srcData['Bx'][i],srcData['By'][i])
+     #if (degrees(alpha) <= 89.9 and degrees(alpha) >= -89.9) or (degrees(alpha) > 91.1 and degrees(alpha) < 269.9):
+     # timeLag = timeLag + (srcData['SCyGSE'][i] - destPos['Y'][i]) * tan(alpha)
      # print 'timeLag = ',timeLag, ', ACE_y = ', srcData['SCyGSE'][i], ', IMP_y = ', destPos['Y'][i], ', tan(B_x/B_y) = ', degrees(alpha)
-      timeLag = timeLag/srcData['Vx'][i]
-      propgLag.extend([abs(timeLag)])
-      epochLag.extend([srcData['epoch'][i] + timedelta(0,propgLag[i])])
+     #print srcData['SCxGSE'][i], destPos['X'][i], 'timeLag = ', timeLag, 'Vx = ', srcData['Vx'][i]
+      if srcData['Vx'][i] != 0:
+       timeLag = srcData['SCxGSE'][i]-destPos['X'][i]
+       timeLag = timeLag/abs(srcData['Vx'][i])
+       propgLag.extend([timeLag])
+       epochLag.extend([srcData['epoch'][i] + timedelta(0,propgLag[i])])
+      elif srcData['Vx'][i] == 0 and i > 0:
+       propgLag.extend([propgLag[i-1]])
+       epochLag.extend([srcData['epoch'][i] + timedelta(0,propgLag[i])])
+      elif srcData['Vx'][i] == 0:
+       print i
     return propgLag, epochLag
 
+def epochShift(usEpoch,usParam,sLag):
+    from bisect import bisect_left
+    from numpy import zeros
+    from datetime import timedelta
+    cEpoch = []
+    for i in range(len(usEpoch)):
+     cEpoch.extend([usEpoch[i] + timedelta(0,sLag[i])])
+    if cEpoch[0] >= usEpoch[0]:
+     sEpochID  = bisect_left(usEpoch, cEpoch[0])
+     eEpochID  = bisect_left(usEpoch,usEpoch[-1])
+    elif cEpoch[0] < usEpoch[0]:
+     sEpochID  = bisect_left(usEpoch,usEpoch[0])
+     eEpochID  = bisect_left(usEpoch, cEpoch[-1])
+
+    sEpoch = usEpoch[sEpochID:eEpochID]
+    sParam = usParam[sEpochID:eEpochID]
+
+    return sEpoch,sParam
+
+
+def kdeBW(obj, fac=1./5):
+    from numpy import power
+    """
+       We use Scott's Rule, multiplied by a constant factor 
+       to calculate the KDE Bandwidth.
+    """
+    return power(obj.n, -1./(obj.d+4)) * fac
+
+def getDesKDE(srcSC,desSC,srcRanges,nPins=10):
+    from scipy.stats import gaussian_kde
+    from numpy import linspace
+    desRanges = []
+    desKDE = []
+    nRanges = len(srcRanges)
+    for i in range(nRanges):
+     desRanges.append([])
+     desKDE.append([])
+
+    for j in range(nRanges):
+     for i in range(len(srcSC)):
+      if srcSC[i] >= srcRanges[j][0] and srcSC[i] <= srcRanges[j][1]:
+       desRanges[j].extend([desSC[i]])
+     if len(desRanges[j]) > 1:
+      jKDE = gaussian_kde(desRanges[j], bw_method=kdeBW)
+      jVAL = linspace(min(desRanges[j]),max(desRanges[j]),nPins)
+      desKDE[j].extend(jKDE(jVAL))
+     else:
+      desKDE[j] = []
+    return desRanges,desKDE
 
 def swMedFilter(swEpoch,swParam,nSeconds):
     from scipy.signal import medfilt
@@ -251,69 +356,84 @@ def ccorr(x, y):
     return xyccorr, argmax(abs(xyccorr))
 
 
-def acorr(x,y):
+def xcorr(x, y, method = 'pearsonr'):
     from numpy import correlate, array, argmax, arange, linspace
-    from scipy import signal
-    if len(x) < len(y):
-     print('Length of first vector must be greater than or equal length of second vector')
-     return ''
-    else:
-     scorr=signal.correlate(x,y,'full')
-    #scorr=correlate(x,y,'full')
+    from scipy.stats import spearmanr, pearsonr
+    method = method.lower()
+    vCorr = []
+    tCorr = []
+    if len(x) > len(y):
+     for i in range(len(x)-len(y)+1):
+      if method == 'pearsonr':
+       v,t = pearsonr(x[i:i+len(y)],y)
+      elif method == 'spearmanr':
+       v,t = spearmanr(x[i:i+len(y)],y)
+      vCorr.append(v)
+      tCorr.append(i)
+    elif len(x) == len(y):
+     if method == 'pearsonr':
+      v,t = pearsonr(x,y)
+     elif method == 'spearmanr':
+      v,t = spearmanr(x,y)
+     vCorr.append(v)
+     tCorr.append(i)
+    elif len(x) < len(y):
+     print 'length of x is smaller than length of y is not allowed'
 
-     nsamples = x.size
-     dt = arange(1-x.size, x.size)
-     scorrLag = dt[scorr.argmax()]
-     return scorr, scorrLag
+    return vCorr, tCorr
     
-def xcorr(x, y, k, normalize=True):
-    import numpy as np
-    n = x.shape[0]
 
-    # initialize the output array
-    out = np.empty((2 * k) + 1, dtype=np.double)
-    lags = np.arange(-k, k + 1)
+def search(a,val):
+    ind = []
+    for i in range(len(a)):
+     if a[i] == val: ind = ind + [i]
+    return ind
 
-    # pre-compute E(x), E(y)
-    mu_x = x.mean()
-    mu_y = y.mean()
-
-    # loop over lags
-    for ii, lag in enumerate(lags):
-
-        # use slice indexing to get 'shifted' views of the two input signals
-        if lag < 0:
-            xi = x[:lag]
-            yi = y[-lag:]
-        elif lag > 0:
-            xi = x[:-lag]
-            yi = y[lag:]
-        else:
-            xi = x
-            yi = y
-
-        # x - mu_x; y - mu_y
-        xdiff = xi - mu_x
-        ydiff = yi - mu_y
-
-        # E[(x - mu_x) * (y - mu_y)]
-        out[ii] = xdiff.dot(ydiff) / n
-
-        # NB: xdiff.dot(ydiff) == (xdiff * ydiff).sum()
-
-    if normalize:
-        # E[(x - mu_x) * (y - mu_y)] / (sigma_x * sigma_y)
-        out /=  np.std(x) * np.std(y)
-
-    return lags, out
+    
+def normalize(inList):
+    s = sum(inList)
+    return map(lambda x: float(x)/s, inList)
 
 
-def kdeBW(obj, fac=1./5):
-    from numpy import power
-    """
-       We use Scott's Rule, multiplied by a constant factor 
-       to calculate the KDE Bandwidth.
-    """
-    return power(obj.n, -1./(obj.d+4)) * fac
+#def xcorr(x, y, k, normalize=True):
+#   import numpy as np
+#   n = x.shape[0]
+
+#   # initialize the output array
+#   out = np.empty((2 * k) + 1, dtype=np.double)
+#   lags = np.arange(-k, k + 1)
+
+#   # pre-compute E(x), E(y)
+#   mu_x = x.mean()
+#   mu_y = y.mean()
+
+#   # loop over lags
+#   for ii, lag in enumerate(lags):
+
+#       # use slice indexing to get 'shifted' views of the two input signals
+#       if lag < 0:
+#           xi = x[:lag]
+#           yi = y[-lag:]
+#       elif lag > 0:
+#           xi = x[:-lag]
+#           yi = y[lag:]
+#       else:
+#           xi = x
+#           yi = y
+
+#       # x - mu_x; y - mu_y
+#       xdiff = xi - mu_x
+#       ydiff = yi - mu_y
+
+#       # E[(x - mu_x) * (y - mu_y)]
+#       out[ii] = xdiff.dot(ydiff) / n
+
+#       # NB: xdiff.dot(ydiff) == (xdiff * ydiff).sum()
+
+#   if normalize:
+#       # E[(x - mu_x) * (y - mu_y)] / (sigma_x * sigma_y)
+#       out /=  np.std(x) * np.std(y)
+
+#   return out, lags
 
 
