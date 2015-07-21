@@ -102,11 +102,17 @@ def epochBlock(epoch, data, blockLen, gapLen, fixStep = True):
      eEpochID  = bisect_left(epoch, cEpoch + timedelta(0,blockLen*3600))
      TT,DD = removeNaN(epoch[sEpochID:eEpochID],data[sEpochID:eEpochID])
      if diff(TT) != []:
-      dt = max(diff(TT))
-      if dt.seconds <= gapLen:
-       blockstart.append(cEpoch)
-       cEpoch = cEpoch + timedelta(0,blockLen*3600)
-      else:
+      try:
+       dt = max(diff(TT))
+       if dt.seconds <= gapLen:
+        blockstart.append(cEpoch)
+        cEpoch = cEpoch + timedelta(0,blockLen*3600)
+       else:
+        if fixStep:
+         cEpoch = cEpoch + timedelta(0,blockLen*3600)
+        else:
+         cEpoch = cEpoch + timedelta(0,3600)
+      except:
        if fixStep:
         cEpoch = cEpoch + timedelta(0,blockLen*3600)
        else:
@@ -259,56 +265,60 @@ def getSolarWindType(swData,gplot = True):
     dy = log10(VA)
     dz = log10(Tr)
 
-    swCat = []
     VEJT=[];VCHO=[];VSRR=[];VSBO=[]
     NEJT=[];NCHO=[];NSRR=[];NSBO=[]
+    TEJT=[];TCHO=[];TSRR=[];TSBO=[]
     BEJT=[];BCHO=[];BSRR=[];BSBO=[]
     EEJT=[];ECHO=[];ESRR=[];ESBO=[]
     for i in range(len(dx)):
-     if dy[i] > 0.277 * dx[i] +0.055 * dz[i] + 1.83:           # Ejecta
-      swCat = swCat + ['EJT']
+     if dy[i] > 0.277 * dx[i] + 0.055 * dz[i] + 1.83:           # Ejecta
       VEJT.extend([swData['V'][i]])
       NEJT.extend([swData['N'][i]])
+      TEJT.extend([swData['T'][i]])
       BEJT.extend([swData['B'][i]])
       EEJT.extend([swData['epoch'][i]])
      elif dx[i] > -0.525 * dz[i] - 0.676 * dy[i] + 1.74:       # Coronal-Hole_Origin
-      swCat = swCat + ['CHO']
       VCHO.extend([swData['V'][i]])
       NCHO.extend([swData['N'][i]])
+      TCHO.extend([swData['T'][i]])
       BCHO.extend([swData['B'][i]])
       ECHO.extend([swData['epoch'][i]])
      elif dx[i] < -0.658 * dy[i] - 0.125 * dz[i] + 1.04:       # Sector-Reversal-Region
-      swCat = swCat + ['SRR']
       VSRR.extend([swData['V'][i]])
       NSRR.extend([swData['N'][i]])
+      TSRR.extend([swData['T'][i]])
       BSRR.extend([swData['B'][i]])
       ESRR.extend([swData['epoch'][i]])
      else:                                                     # Streamer-Belt-Origin
-      swCat = swCat + ['SBO']
       VSBO.extend([swData['V'][i]])
       NSBO.extend([swData['N'][i]])
+      TSBO.extend([swData['T'][i]])
       BSBO.extend([swData['B'][i]])
       ESBO.extend([swData['epoch'][i]])
 
-    swCats = {'swCat':swCat, 'Sp':array(Sp), 'Tr':array(Tr), 'VA':array(VA)}
+    swCats = {'Sp':array(Sp), 'Tr':array(Tr), 'VA':array(VA)}
 
     swCats['VEJT'] = array(VEJT)
     swCats['NEJT'] = array(NEJT)
+    swCats['TEJT'] = array(TEJT)
     swCats['BEJT'] = array(BEJT)
     swCats['EEJT'] = array(EEJT)
 
     swCats['VCHO'] = array(VCHO)
     swCats['NCHO'] = array(NCHO)
+    swCats['TCHO'] = array(TCHO)
     swCats['BCHO'] = array(BCHO)
     swCats['ECHO'] = array(ECHO)
 
     swCats['VSRR'] = array(VSRR)
     swCats['NSRR'] = array(NSRR)
+    swCats['TSRR'] = array(TSRR)
     swCats['BSRR'] = array(BSRR)
     swCats['ESRR'] = array(ESRR)
 
     swCats['VSBO'] = array(VSBO)
     swCats['NSBO'] = array(NSBO)
+    swCats['TSBO'] = array(TSBO)
     swCats['BSBO'] = array(BSBO)
     swCats['ESBO'] = array(ESBO)
 
@@ -337,14 +347,12 @@ def getSolarWindType(swData,gplot = True):
      plt.xlabel('Date')
      plt.legend(loc='best')
      plt.title('Solar Wind Categorization')
-     plt.show()
-
 
    #return list(Sp), list(Tr), list(VA), SWPClass
     return swCats
 
 
-def getTimeLag(srcData,destPos,method='standard'):
+def getTimeLag(epoch,srcData,destPos,method='standard'):
     from math import atan2, tan, degrees, radians
     from datetime import timedelta
     from numpy import arange, isfinite
@@ -354,41 +362,17 @@ def getTimeLag(srcData,destPos,method='standard'):
     epochLag=[]
     if method == 'standard':
      for i in range(len(srcData['epoch'])):
-     #alpha   = atan2(srcData['Bx'][i],srcData['By'][i])
-     #if (degrees(alpha) <= 89.9 and degrees(alpha) >= -89.9) or (degrees(alpha) > 91.1 and degrees(alpha) < 269.9):
-     # timeLag = timeLag + (srcData['SCyGSE'][i] - destPos['Y'][i]) * tan(alpha)
-     # print 'timeLag = ',timeLag, ', ACE_y = ', srcData['SCyGSE'][i], ', IMP_y = ', destPos['Y'][i], ', tan(B_x/B_y) = ', degrees(alpha)
-     #print srcData['SCxGSE'][i], destPos['X'][i], 'timeLag = ', timeLag, 'Vx = ', srcData['Vx'][i]
       if srcData['Vx'][i] != 0:
        timeLag = srcData['SCxGSE'][i]-destPos['X'][i]
        timeLag = timeLag/abs(srcData['Vx'][i])
        propgLag.extend([timeLag])
-       epochLag.extend([srcData['epoch'][i] + timedelta(0,propgLag[i])])
+       epochLag.extend([epoch[i] + timedelta(0,propgLag[i])])
       elif srcData['Vx'][i] == 0 and i > 0:
        propgLag.extend([propgLag[i-1]])
-       epochLag.extend([srcData['epoch'][i] + timedelta(0,propgLag[i])])
+       epochLag.extend([epoch[i] + timedelta(0,propgLag[i])])
       elif srcData['Vx'][i] == 0:
-       print i
+       print 'I found Vx = 0 at index = ', i
     return propgLag, epochLag
-
-def epochShift(usEpoch,usParam,sLag):
-    from bisect import bisect_left
-    from numpy import zeros
-    from datetime import timedelta
-    cEpoch = []
-    for i in range(len(usEpoch)):
-     cEpoch.extend([usEpoch[i] + timedelta(0,sLag[i])])
-    if cEpoch[0] >= usEpoch[0]:
-     sEpochID  = bisect_left(usEpoch, cEpoch[0])
-     eEpochID  = bisect_left(usEpoch,usEpoch[-1])
-    elif cEpoch[0] < usEpoch[0]:
-     sEpochID  = bisect_left(usEpoch,usEpoch[0])
-     eEpochID  = bisect_left(usEpoch, cEpoch[-1])
-
-    sEpoch = usEpoch[sEpochID:eEpochID]
-    sParam = usParam[sEpochID:eEpochID]
-
-    return sEpoch,sParam
 
 
 def kdeBW(obj, fac=1./5):
@@ -413,12 +397,15 @@ def getDesKDE(srcSC,desSC,srcRanges,nPins=10):
      for i in range(len(srcSC)):
       if srcSC[i] >= srcRanges[j][0] and srcSC[i] <= srcRanges[j][1]:
        desRanges[j].extend([desSC[i]])
-     if len(desRanges[j]) > 1:
-      desRanges[j] = rejectOutliers(array(desRanges[j]))
-      jKDE = gaussian_kde(desRanges[j], bw_method=kdeBW)
-      jVAL = linspace(min(desRanges[j]),max(desRanges[j]),nPins)
-      desKDE[j].extend(jKDE(jVAL))
-     else:
+     desRanges[j] = rejectOutliers(array(desRanges[j]))
+     try:
+      if len(desRanges[j]) > 1:
+       jKDE = gaussian_kde(desRanges[j], bw_method=kdeBW)
+       jVAL = linspace(min(desRanges[j]),max(desRanges[j]),nPins)
+       desKDE[j].extend(jKDE(jVAL))
+      else:
+       desKDE[j] = []
+     except:
       desKDE[j] = []
     return desRanges,desKDE
 

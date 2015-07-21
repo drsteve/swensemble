@@ -321,19 +321,19 @@ def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
        swData[dataList[j]] = [swDataTMP[0][sEpochPID:eEpochPID],swDataTMP[1][sEpochPID:eEpochPID],swDataTMP[2][sEpochPID:eEpochPID]]
        if dataStat == 'clean':
         if dataList[j] == 'V_GSE':
-         swData[dataList[j]][0] = dataClean(swData[dataList[j]][0],[2500,-2500],['>','<'])
-         swData[dataList[j]][1] = dataClean(swData[dataList[j]][1],[2500,-2500],['>','<'])
-         swData[dataList[j]][2] = dataClean(swData[dataList[j]][2],[2500,-2500],['>','<'])
+         swData[dataList[j]][0] = dataClean(swData[dataList[j]][0],[2500,0,-2500],['>','=','<'])
+         swData[dataList[j]][1] = dataClean(swData[dataList[j]][1],[2500,0,-2500],['>','=','<'])
+         swData[dataList[j]][2] = dataClean(swData[dataList[j]][2],[2500,0,-2500],['>','=','<'])
      else:
       if dataList[j] in ACEBparams:
        swData[dataList[j]] = dataStorage[j][sEpochBID:eEpochBID]
       elif dataList[j] in ACEPparams:
        swData[dataList[j]] = dataStorage[j][sEpochPID:eEpochPID]
       if dataStat == 'clean':
-       if dataList[j] == 'Np': swData[dataList[j]] = dataClean(swData[dataList[j]],[9999,0],['>=','<'])
-       if dataList[j] == 'Vp': swData[dataList[j]] = dataClean(swData[dataList[j]],[2500,-2500],['>=','<='])
-       if dataList[j] == 'Magnitude': swData[dataList[j]] = dataClean(swData[dataList[j]],[-999],['<='])
-       if dataList[j] == 'Tpr': swData[dataList[j]] = dataClean(swData[dataList[j]],[0],['<'])
+       if dataList[j] == 'Np': swData[dataList[j]] = dataClean(swData[dataList[j]],[999,0],['>=','<='])
+       if dataList[j] == 'Vp': swData[dataList[j]] = dataClean(swData[dataList[j]],[2500,0,-2500],['>=','=','<='])
+       if dataList[j] == 'Magnitude': swData[dataList[j]] = dataClean(swData[dataList[j]],[-999,0,999],['<=','=','>='])
+       if dataList[j] == 'Tpr': swData[dataList[j]] = dataClean(swData[dataList[j]],[1e8,0],['>=','<='])
 
     return swData
 
@@ -542,11 +542,13 @@ def getIMP8data(imp8Dates,dataLoc,dataList,imp8Set='15sec',dataStat='raw'):
        swData[dataList[j]] = dataStorage[j][sEpochPID:eEpochPID]
       if dataStat == 'clean':
        if dataList[j] == 'proton_density_fit':
-        swData[dataList[j]] = dataClean(swData[dataList[j]],[9999,0,-9999],['>=','<','<='])
+        swData[dataList[j]] = dataClean(swData[dataList[j]],[999,0,-999],['>=','=','<='])
        elif dataList[j] == 'protonV_thermal_fit':
-        swData[dataList[j]] = dataClean(swData[dataList[j]],[9999,0,-9999],['>=','<','<='])
+        swData[dataList[j]] = dataClean(swData[dataList[j]],[999,0,-999],['>=','=','<='])
+       elif dataList[j] == 'protonV_thermal_mom':
+        swData[dataList[j]] = dataClean(swData[dataList[j]],[999,0,-999],['>=','=','<='])
        elif dataList[j] == 'V_fit':
-        swData[dataList[j]] = dataClean(swData[dataList[j]],[3000,0],['>','<'])
+        swData[dataList[j]] = dataClean(swData[dataList[j]],[2500,0,-2500],['>=','=','<='])
 
     return swData
 
@@ -571,7 +573,7 @@ def imp8DataAdjust(Data,epoch=[],epochLen='not fixed'):
      DataAdj['SCzGSE'] = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][2],interpKind='cubic'))*RE
      DataAdj['N']      = array(Data['proton_density_fit'])
      DataAdj['V']      = array(Data['V_fit'])
-     DataAdj['T']      = (mi/KB)*(array(Data['protonV_thermal_fit'])/1000.0)**2
+     DataAdj['T']      = (mi/KB)*(array(Data['protonV_thermal_fit'])*1000.0)**2
     elif epochLen == 'fixed' and epoch == Data['magneticEpoch']:
      DataAdj={'epoch':epoch}
      DataAdj['Bx']     = array(Data['B_Vector_GSE'][0])
@@ -585,7 +587,7 @@ def imp8DataAdjust(Data,epoch=[],epochLen='not fixed'):
      DataAdj['SCzGSE'] = array(Data['SC_Pos_GSE'][2])*RE
      DataAdj['N']      = array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],Data['proton_density_fit'],interpKind='cubic'))
      DataAdj['V']      = array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],Data['V_fit'],interpKind='cubic'))
-     DataAdj['T']      = array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],(mi/KB)*(Data['protonV_thermal_fit']/1000.0)**2,interpKind='cubic'))
+     DataAdj['T']      = array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],(mi/KB)*(Data['protonV_thermal_fit']*1000.0)**2,interpKind='cubic'))
     elif epochLen == 'fixed' and epoch != []:
      DataAdj={'epoch':epoch}
      DataAdj['Bx']     = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['B_Vector_GSE'][0],interpKind='cubic'))
@@ -599,7 +601,7 @@ def imp8DataAdjust(Data,epoch=[],epochLen='not fixed'):
      DataAdj['SCzGSE'] = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][2],interpKind='cubic'))*RE
      DataAdj['N']      = array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['proton_density_fit'],interpKind='cubic'))
      DataAdj['V']      = array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['V_fit'],interpKind='cubic'))
-     DataAdj['T']      = array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],(mi/KB)*(Data['protonV_thermal_fit']/1000.0)**2,interpKind='cubic'))
+     DataAdj['T']      = array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],(mi/KB)*(Data['protonV_thermal_fit']*1000.0)**2,interpKind='cubic'))
     else:
      DataAdj={'plasmaEpoch':Data['plasmaEpoch'],'magneticEpoch':Data['magneticEpoch']}
      DataAdj['Bx']     = array(Data['B_Vector_GSE'][0])
@@ -613,7 +615,7 @@ def imp8DataAdjust(Data,epoch=[],epochLen='not fixed'):
      DataAdj['SCzGSE'] = array(Data['SC_Pos_GSE'][2])*RE
      DataAdj['N']      = array(Data['proton_density_fit'])
      DataAdj['V']      = array(Data['V_fit'])
-     DataAdj['T']      = (mi/KB)*(array(Data['protonV_thermal_fit'])/1000.0)**2
+     DataAdj['T']      = (mi/KB)*(array(Data['protonV_thermal_fit'])*1000.0)**2
 
      return DataAdj
     
@@ -1020,7 +1022,7 @@ def removeNaN(epoch,data):
     return newEpoch,newData
 
 
-def epochMatch(refEpoch,epoch,data,interpKind='cubic'):
+def mapDataToEpoch(refEpoch,epoch,data,interpKind='linear'):
     from time import mktime
     from scipy.interpolate import interp1d
 
@@ -1035,14 +1037,63 @@ def epochMatch(refEpoch,epoch,data,interpKind='cubic'):
      epochStamp.extend([mktime(epoch[i].timetuple())])
 
     f = interp1d(epochStamp, data, bounds_error=False, fill_value=0.0, kind = interpKind)
-   #f = interp1d(epochStamp, data, kind = interpKind)
 
     return f(refEpochStamp)
 
-   #print datetime.datetime.fromtimestamp(epochStamp)
+#def commonEpoch(epoch1,epoch2):
+#   from bisect import bisect_left
+#   if epoch1[0] <= epoch2[0]:
+#    sEpoch = bisect_left(epoch1, epoch2[0])
+#   elif epoch1[0] > epoch2[0]:
+#    sEpoch = bisect_left(epoch1, epoch1[0])
+
+#   if epoch1[-1] <= epoch2[-1]:
+#    eEpoch = bisect_left(epoch1, epoch1[-1])
+#   elif epoch1[-1] > epoch2[-1]:
+#    eEpoch = bisect_left(epoch1, epoch2[-1])
+
+#   return epoch1[sEpoch:eEpoch+1], range(sEpoch,eEpoch+1,1)
+
+def commonEpoch(epoch1,epoch2):
+    from bisect import bisect_left
+    from swdatanal import search
+    cmnEpoch = []
+    indEpoch = []
+    for epoch in epoch2:
+     if epoch <= epoch1[-1] and epoch >= epoch1[0]:
+      ind = bisect_left(epoch1, epoch)
+      target = epoch1[ind]
+      if search(cmnEpoch,epoch1[ind]) == []:
+       cmnEpoch.extend([epoch1[ind]])
+       indEpoch.extend([ind])
+    return cmnEpoch, indEpoch
 
 
+def epochShift(usEpoch,sLag):
+    from datetime import timedelta
+    sEpoch = []
+    for i in range(len(usEpoch)):
+     sEpoch.extend([usEpoch[i] + timedelta(0,sLag[i])])
+    return sEpoch
 
+#def epochShift(usEpoch,usParam,sLag):
+#   from bisect import bisect_left
+#   from numpy import zeros
+#   from datetime import timedelta
+#   cEpoch = []
+#   for i in range(len(usEpoch)):
+#    cEpoch.extend([usEpoch[i] + timedelta(0,sLag[i])])
+#   if cEpoch[0] >= usEpoch[0]:
+#    sEpochID  = bisect_left(usEpoch, cEpoch[0])
+#    eEpochID  = bisect_left(usEpoch,usEpoch[-1])
+#   elif cEpoch[0] < usEpoch[0]:
+#    sEpochID  = bisect_left(usEpoch,usEpoch[0])
+#    eEpochID  = bisect_left(usEpoch, cEpoch[-1])
+
+#   sEpoch = usEpoch[sEpochID:eEpochID]
+#   sParam = usParam[sEpochID:eEpochID]
+
+#   return sEpoch,sParam
 
 
  
