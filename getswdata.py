@@ -321,9 +321,12 @@ def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
        swData[dataList[j]] = [swDataTMP[0][sEpochPID:eEpochPID],swDataTMP[1][sEpochPID:eEpochPID],swDataTMP[2][sEpochPID:eEpochPID]]
        if dataStat == 'clean':
         if dataList[j] == 'V_GSE':
-         swData[dataList[j]][0] = dataClean(swData[dataList[j]][0],[2500,0,-2500],['>','=','<'])
-         swData[dataList[j]][1] = dataClean(swData[dataList[j]][1],[2500,0,-2500],['>','=','<'])
-         swData[dataList[j]][2] = dataClean(swData[dataList[j]][2],[2500,0,-2500],['>','=','<'])
+        #swData[dataList[j]][0] = dataClean(swData[dataList[j]][0],[2500,0,-2500],['>','=','<'])
+        #swData[dataList[j]][1] = dataClean(swData[dataList[j]][1],[2500,0,-2500],['>','=','<'])
+        #swData[dataList[j]][2] = dataClean(swData[dataList[j]][2],[2500,0,-2500],['>','=','<'])
+         swData[dataList[j]][0] = dataClean(abs(swData[dataList[j]][0]),[2500,250],['>','<'])
+         swData[dataList[j]][1] = dataClean(abs(swData[dataList[j]][1]),[2500,250],['>','<'])
+         swData[dataList[j]][2] = dataClean(abs(swData[dataList[j]][2]),[2500,250],['>','<'])
      else:
       if dataList[j] in ACEBparams:
        swData[dataList[j]] = dataStorage[j][sEpochBID:eEpochBID]
@@ -331,7 +334,7 @@ def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
        swData[dataList[j]] = dataStorage[j][sEpochPID:eEpochPID]
       if dataStat == 'clean':
        if dataList[j] == 'Np': swData[dataList[j]] = dataClean(swData[dataList[j]],[999,0],['>=','<='])
-       if dataList[j] == 'Vp': swData[dataList[j]] = dataClean(swData[dataList[j]],[2500,0,-2500],['>=','=','<='])
+       if dataList[j] == 'Vp': swData[dataList[j]] = dataClean(swData[dataList[j]],[2500,250],['>','<'])
        if dataList[j] == 'Magnitude': swData[dataList[j]] = dataClean(swData[dataList[j]],[-999,0,999],['<=','=','>='])
        if dataList[j] == 'Tpr': swData[dataList[j]] = dataClean(swData[dataList[j]],[1e8,0],['>=','<='])
 
@@ -544,11 +547,11 @@ def getIMP8data(imp8Dates,dataLoc,dataList,imp8Set='15sec',dataStat='raw'):
        if dataList[j] == 'proton_density_fit':
         swData[dataList[j]] = dataClean(swData[dataList[j]],[999,0,-999],['>=','=','<='])
        elif dataList[j] == 'protonV_thermal_fit':
-        swData[dataList[j]] = dataClean(swData[dataList[j]],[999,0,-999],['>=','=','<='])
+        swData[dataList[j]] = dataClean(swData[dataList[j]],[99,0,-99],['>=','=','<='])
        elif dataList[j] == 'protonV_thermal_mom':
-        swData[dataList[j]] = dataClean(swData[dataList[j]],[999,0,-999],['>=','=','<='])
+        swData[dataList[j]] = dataClean(swData[dataList[j]],[99,0,-99],['>=','=','<='])
        elif dataList[j] == 'V_fit':
-        swData[dataList[j]] = dataClean(swData[dataList[j]],[2500,0,-2500],['>=','=','<='])
+        swData[dataList[j]] = dataClean(swData[dataList[j]],[2500,250],['>','<'])
 
     return swData
 
@@ -1012,14 +1015,20 @@ def dateList(sDate, eDate, shift = 'day'):
 
     return dList   
 
-def removeNaN(epoch,data):
-    newEpoch=[]; newData=[]
-    for i in range(len(epoch)):
-     if str(data[i]) != 'nan':
-      newEpoch.extend([epoch[i]])
-      newData.extend([data[i]])
-
-    return newEpoch,newData
+def removeNaN(data,epoch=[]):
+    if epoch == []:
+     newData=[]
+     for i in range(len(data)):
+      if str(data[i]) != 'nan':
+       newData.extend([data[i]])
+     return newData
+    elif epoch != []:
+     newEpoch=[]; newData=[]
+     for i in range(len(epoch)):
+      if str(data[i]) != 'nan':
+       newEpoch.extend([epoch[i]])
+       newData.extend([data[i]])
+     return newEpoch,newData
 
 
 def mapDataToEpoch(refEpoch,epoch,data,interpKind='linear'):

@@ -98,9 +98,16 @@ def epochBlock(epoch, data, blockLen, gapLen, fixStep = True):
     blockstart = []
     cEpoch = epoch[0]
     while cEpoch < epoch[-(blockLen-1)]:
-     sEpochID  = bisect_left(epoch, cEpoch + timedelta(0,0))
-     eEpochID  = bisect_left(epoch, cEpoch + timedelta(0,blockLen*3600))
-     TT,DD = removeNaN(epoch[sEpochID:eEpochID],data[sEpochID:eEpochID])
+     try:
+      sEpochID  = bisect_left(epoch, cEpoch + timedelta(0,0))
+      eEpochID  = bisect_left(epoch, cEpoch + timedelta(0,blockLen*3600))
+     except:
+      if fixStep:
+       cEpoch = cEpoch + timedelta(0,blockLen*3600)
+      else:
+       cEpoch = cEpoch + timedelta(0,3600)
+      continue
+     TT,DD = removeNaN(data[sEpochID:eEpochID],epoch = epoch[sEpochID:eEpochID])
      if diff(TT) != []:
       try:
        dt = max(diff(TT))
@@ -190,12 +197,6 @@ def getDistrib(data, nbins=0, stride=0, bins=[], norm = False):
      return dist, bins
 
 
-def getIndices(inList, item):
-    from numpy import isnan
-    indices = [i for i in range(len(inList)) if isnan(inList[i])]
-    return indices
-
-
 def omniDataCorr(srefDate, erefDate, startDate, endDate, epochs, SWP, binStride, CorrTime = 'Day', CorrType = 'kstest'):
     import numpy
     import bisect
@@ -251,7 +252,7 @@ def omniDataCorr(srefDate, erefDate, startDate, endDate, epochs, SWP, binStride,
     return SWPDatRng, cepochs, KSVals, KSDist, aepochs
    
 
-def getSolarWindType(swData,gplot = True):
+def getSolarWindType(swData,nCats = 4, gplot = True):
     from  numpy import array, log10, dot, sign
     import matplotlib.pyplot as plt
     import scipy.constants
@@ -270,31 +271,52 @@ def getSolarWindType(swData,gplot = True):
     TEJT=[];TCHO=[];TSRR=[];TSBO=[]
     BEJT=[];BCHO=[];BSRR=[];BSBO=[]
     EEJT=[];ECHO=[];ESRR=[];ESBO=[]
-    for i in range(len(dx)):
-     if dy[i] > 0.277 * dx[i] + 0.055 * dz[i] + 1.83:           # Ejecta
-      VEJT.extend([swData['V'][i]])
-      NEJT.extend([swData['N'][i]])
-      TEJT.extend([swData['T'][i]])
-      BEJT.extend([swData['B'][i]])
-      EEJT.extend([swData['epoch'][i]])
-     elif dx[i] > -0.525 * dz[i] - 0.676 * dy[i] + 1.74:       # Coronal-Hole_Origin
-      VCHO.extend([swData['V'][i]])
-      NCHO.extend([swData['N'][i]])
-      TCHO.extend([swData['T'][i]])
-      BCHO.extend([swData['B'][i]])
-      ECHO.extend([swData['epoch'][i]])
-     elif dx[i] < -0.658 * dy[i] - 0.125 * dz[i] + 1.04:       # Sector-Reversal-Region
-      VSRR.extend([swData['V'][i]])
-      NSRR.extend([swData['N'][i]])
-      TSRR.extend([swData['T'][i]])
-      BSRR.extend([swData['B'][i]])
-      ESRR.extend([swData['epoch'][i]])
-     else:                                                     # Streamer-Belt-Origin
-      VSBO.extend([swData['V'][i]])
-      NSBO.extend([swData['N'][i]])
-      TSBO.extend([swData['T'][i]])
-      BSBO.extend([swData['B'][i]])
-      ESBO.extend([swData['epoch'][i]])
+    if nCats == 4:
+     for i in range(len(dx)):
+      if dy[i] > 0.277 * dx[i] + 0.055 * dz[i] + 1.83:           # Ejecta
+       VEJT.extend([swData['V'][i]])
+       NEJT.extend([swData['N'][i]])
+       TEJT.extend([swData['T'][i]])
+       BEJT.extend([swData['B'][i]])
+       EEJT.extend([swData['epoch'][i]])
+      elif dx[i] > -0.525 * dz[i] - 0.676 * dy[i] + 1.74:       # Coronal-Hole_Origin
+       VCHO.extend([swData['V'][i]])
+       NCHO.extend([swData['N'][i]])
+       TCHO.extend([swData['T'][i]])
+       BCHO.extend([swData['B'][i]])
+       ECHO.extend([swData['epoch'][i]])
+      elif dx[i] < -0.658 * dy[i] - 0.125 * dz[i] + 1.04:       # Sector-Reversal-Region
+       VSRR.extend([swData['V'][i]])
+       NSRR.extend([swData['N'][i]])
+       TSRR.extend([swData['T'][i]])
+       BSRR.extend([swData['B'][i]])
+       ESRR.extend([swData['epoch'][i]])
+      else:                                                     # Streamer-Belt-Origin
+       VSBO.extend([swData['V'][i]])
+       NSBO.extend([swData['N'][i]])
+       TSBO.extend([swData['T'][i]])
+       BSBO.extend([swData['B'][i]])
+       ESBO.extend([swData['epoch'][i]])
+    elif nCats == 3:
+     for i in range(len(dx)):
+      if dy[i] > 0.277 * dx[i] + 0.055 * dz[i] + 1.83:           # Ejecta
+       VEJT.extend([swData['V'][i]])
+       NEJT.extend([swData['N'][i]])
+       TEJT.extend([swData['T'][i]])
+       BEJT.extend([swData['B'][i]])
+       EEJT.extend([swData['epoch'][i]])
+      elif dx[i] > -0.525 * dz[i] - 0.676 * dy[i] + 1.74:       # Coronal-Hole_Origin
+       VCHO.extend([swData['V'][i]])
+       NCHO.extend([swData['N'][i]])
+       TCHO.extend([swData['T'][i]])
+       BCHO.extend([swData['B'][i]])
+       ECHO.extend([swData['epoch'][i]])
+      else:                                                     # Streamer-Belt-Origin
+       VSBO.extend([swData['V'][i]])
+       NSBO.extend([swData['N'][i]])
+       TSBO.extend([swData['T'][i]])
+       BSBO.extend([swData['B'][i]])
+       ESBO.extend([swData['epoch'][i]])
 
     swCats = {'Sp':array(Sp), 'Tr':array(Tr), 'VA':array(VA)}
 
@@ -327,21 +349,22 @@ def getSolarWindType(swData,gplot = True):
      plt.subplot(3,1,1)
      plt.plot(swCats['EEJT'],swCats['VEJT'], 'bo', label = 'Ejecta')
      plt.plot(swCats['ECHO'],swCats['VCHO'], 'ro', label = 'Conronal-Hole')
-     plt.plot(swCats['ESRR'],swCats['VSRR'], 'mo', label = 'Sector-Reversal')
+     if nCats == 4: plt.plot(swCats['ESRR'],swCats['VSRR'], 'mo', label = 'Sector-Reversal')
      plt.plot(swCats['ESBO'],swCats['VSBO'], 'go', label = 'Streamer-Belt')
      plt.ylabel('Flow Velocity (km/s)')
+     plt.title('Solar Wind Categorization')
      plt.legend(loc='best')
      plt.subplot(3,1,2)
      plt.plot(swCats['EEJT'],swCats['NEJT'], 'bo', label = 'Ejecta')
      plt.plot(swCats['ECHO'],swCats['NCHO'], 'ro', label = 'Conronal-Hole')
-     plt.plot(swCats['ESRR'],swCats['NSRR'], 'mo', label = 'Sector-Reversal')
+     if nCats == 4: plt.plot(swCats['ESRR'],swCats['NSRR'], 'mo', label = 'Sector-Reversal')
      plt.plot(swCats['ESBO'],swCats['NSBO'], 'go', label = 'Streamer-Belt')
      plt.ylabel('Flow Density (N/cc)')
      plt.legend(loc='best')
      plt.subplot(3,1,3)
      plt.plot(swCats['EEJT'],swCats['BEJT'], 'bo', label = 'Ejecta')
      plt.plot(swCats['ECHO'],swCats['BCHO'], 'ro', label = 'Conronal-Hole')
-     plt.plot(swCats['ESRR'],swCats['BSRR'], 'mo', label = 'Sector-Reversal')
+     if nCats == 4: plt.plot(swCats['ESRR'],swCats['BSRR'], 'mo', label = 'Sector-Reversal')
      plt.plot(swCats['ESBO'],swCats['BSBO'], 'go', label = 'Streamer-Belt')
      plt.ylabel('$B_z$ (nT)')
      plt.xlabel('Date')
@@ -352,7 +375,7 @@ def getSolarWindType(swData,gplot = True):
     return swCats
 
 
-def getTimeLag(epoch,srcData,destPos,method='standard'):
+def getTimeLag(epoch,srcData,destPos,method='flat'):
     from math import atan2, tan, degrees, radians
     from datetime import timedelta
     from numpy import arange, isfinite
@@ -360,7 +383,7 @@ def getTimeLag(epoch,srcData,destPos,method='standard'):
     method = method.lower()
     propgLag=[]
     epochLag=[]
-    if method == 'standard':
+    if method == 'flat':
      for i in range(len(srcData['epoch'])):
       if srcData['Vx'][i] != 0:
        timeLag = srcData['SCxGSE'][i]-destPos['X'][i]
@@ -383,16 +406,41 @@ def kdeBW(obj, fac=1./5):
     """
     return power(obj.n, -1./(obj.d+4)) * fac
 
+
+def getIndices(inList, item):
+    from numpy import isnan
+    indices = [i for i in range(len(inList)) if isnan(inList[i])]
+    return indices
+
+
 def getDesKDE(srcSC,desSC,srcRanges,nPins=10):
     from scipy.stats import gaussian_kde
     from numpy import linspace,array
     desRanges = []
     desKDE = []
     nRanges = len(srcRanges)
+
     for i in range(nRanges):
      desRanges.append([])
      desKDE.append([])
-
+     for j in range(len(srcSC)):
+      if srcSC[j] >= srcRanges[i][0] and srcSC[j] <= srcRanges[i][1]:
+       desRanges[i].extend([desSC[j]])
+     desRanges[i]
+    #desRanges[i] = dataClean(desRanges[i],[250],['<'])
+    #desRanges[i] = removeNaN(desRanges[i])
+     desRanges[i] = rejectOutliers(array(desRanges[i]))
+     try:
+      if len(desRanges[i]) > 1:
+       jKDE = gaussian_kde(desRanges[i], bw_method=kdeBW)
+       jVAL = linspace(min(desRanges[i]),max(desRanges[i]),nPins)
+       desKDE[i].extend(jKDE(jVAL))
+      else:
+       desKDE[i] = []
+     except:
+      desKDE[i] = []
+    return desRanges,desKDE
+    '''
     for j in range(nRanges):
      for i in range(len(srcSC)):
       if srcSC[i] >= srcRanges[j][0] and srcSC[i] <= srcRanges[j][1]:
@@ -408,6 +456,7 @@ def getDesKDE(srcSC,desSC,srcRanges,nPins=10):
      except:
       desKDE[j] = []
     return desRanges,desKDE
+    '''
 
 def swMedFilter(swEpoch,swParam,nSeconds):
     from scipy.signal import medfilt
@@ -425,7 +474,7 @@ def swMedFilter(swEpoch,swParam,nSeconds):
  
     return swParamMF
 
-def rejectOutliers(data,m=2.):
+def rejectOutliers(data,m=20.):
     from numpy import median
     d = abs(data - median(data))
     mdev = median(d)
@@ -443,31 +492,41 @@ def ccorr(x, y):
     return xyccorr, argmax(abs(xyccorr))
 
 
-def xcorr(x, y, method = 'pearsonr'):
+def xcorr(x, y, method = 'pearsonr', shift = 5):
     from numpy import correlate, array, argmax, arange, linspace
     from scipy.stats import spearmanr, pearsonr
     method = method.lower()
     vCorr = []
     tCorr = []
-    if len(x) > len(y):
-     for i in range(len(x)-len(y)+1):
+    if shift == 0:
+     if len(x) >= len(y):
       if method == 'pearsonr':
-       v,t = pearsonr(x[i:i+len(y)],y)
+       v,t =  pearsonr(x[0:len(y)],y)
       elif method == 'spearmanr':
-       v,t = spearmanr(x[i:i+len(y)],y)
+       v,t = spearmanr(x[0:len(y)],y)
+     elif len(x) < len(y):
+      if method == 'pearsonr':
+       v,t =  pearsonr(x,y[0:len(x)])
+      elif method == 'spearmanr':
+       v,t = spearmanr(x,y[0:len(x)])
       vCorr.append(v)
-      tCorr.append(i)
-    elif len(x) == len(y):
-     if method == 'pearsonr':
-      v,t = pearsonr(x,y)
-     elif method == 'spearmanr':
-      v,t = spearmanr(x,y)
-     vCorr.append(v)
-     tCorr.append(i)
-    elif len(x) < len(y):
-     print 'length of x is smaller than length of y is not allowed'
+    elif shift > 0 and shift < len(y):
+     iCounter = 0
+     for j in range(0,len(y)-shift,shift):
+      vCorr.append([])
+      tCorr.append([])
+      for i in range(0,len(x)):
+       if len(x[i:i+len(y[j:j+shift])]) == len(y[j:j+shift]):
+        if method == 'pearsonr':
+         v,t =  pearsonr(x[i:i+len(y[j:j+shift])],y[j:j+shift])
+        elif method == 'spearmanr':
+         v,t = spearmanr(x[i:i+len(y[j:j+shift])],y[j:j+shift])
+        vCorr[iCounter].extend([v])
+        tCorr[iCounter].extend([i])
+      iCounter = iCounter + 1
+        
 
-    return vCorr, tCorr
+    return array(vCorr), array(tCorr)
     
 
 def search(a,val):
