@@ -266,6 +266,29 @@ def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
     if len(aceSet) == 2:
      aceSet[0] = aceSet[0].lower()
      aceSet[1] = aceSet[1].lower()
+     ACEBparams = getACEparams(aceDates,dataLoc,aceSet[0],aceDat='magnetic')
+     ACEPparams = getACEparams(aceDates,dataLoc,aceSet[1],aceDat='plasma')
+    elif len(aceSet) == 1:
+     aceSet[0] = aceSet[0].lower()
+     ACEBparams = getACEparams(aceDates,dataLoc,aceSet[0],aceDat='magnetic')
+     ACEPparams = getACEparams(aceDates,dataLoc,aceSet='1min',aceDat='plasma')
+
+    for j in range(len(dataList)):
+     if dataList[j] in ACEBparams: bpFlag = True
+     if dataList[j] in ACEPparams: ppFlag = True
+
+    if bpFlag:
+     ACEBfnames = getACEfiles(aceDates,dataLoc,aceSet[0],aceDat='magnetic')
+    if ppFlag:
+     if len(aceSet) == 2:
+      ACEPfnames = getACEfiles(aceDates,dataLoc,aceSet[1],aceDat='plasma')
+     elif len(aceSet) == 1:
+      ACEPfnames = getACEfiles(aceDates,dataLoc,aceSet='1min',aceDat='plasma')
+
+'''
+    if len(aceSet) == 2:
+     aceSet[0] = aceSet[0].lower()
+     aceSet[1] = aceSet[1].lower()
      ACEBfnames = getACEfiles(aceDates,dataLoc,aceSet[0],aceDat='magnetic')
      ACEBparams = getACEparams(aceDates,dataLoc,aceSet[0],aceDat='magnetic')
      ACEPfnames = getACEfiles(aceDates,dataLoc,aceSet[1],aceDat='plasma')
@@ -276,11 +299,35 @@ def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
      ACEBparams = getACEparams(aceDates,dataLoc,aceSet[0],aceDat='magnetic')
      ACEPfnames = getACEfiles(aceDates,dataLoc,aceSet='1min',aceDat='plasma')
      ACEPparams = getACEparams(aceDates,dataLoc,aceSet='1min',aceDat='plasma')
-
+'''
     dataStorage = []
     for j in range(len(dataList)+2):
      dataStorage.append([])
 
+    for j in range(len(dataList)):
+     if dataList[j] in ACEBparams: bpFlag = True
+     if dataList[j] in ACEPparams: ppFlag = True
+
+    if bpFlag:
+     for i in range(len(ACEBfnames)):
+      cdf = pycdf.CDF(ACEBfnames[i])
+      dataStorage[len(dataList)].extend(list(cdf['Epoch']))
+      for j in range(len(dataList)):
+       if dataList[j] in ACEBparams:
+        dataStorage[j].extend(list(cdf[dataList[j]]))
+      cdf.close()
+
+    if ppFlag:
+     for i in range(len(ACEPfnames)):
+      cdf = pycdf.CDF(ACEPfnames[i])
+      dataStorage[len(dataList)+1].extend(list(cdf['Epoch']))
+      for j in range(len(dataList)):
+       if dataList[j] in ACEPparams:
+        dataStorage[j].extend(list(cdf[dataList[j]]))
+      cdf.close()
+
+
+'''
     bFlage = True
     pFlage = True
     for j in range(len(dataList)):
@@ -300,6 +347,7 @@ def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
       cdf.close()
      else:
        print dataList[j], ' is not available in ACE CDF File!'
+'''
 
     sEpochBID  = bisect_left(dataStorage[len(dataList)], aceDates[0])
     eEpochBID  = bisect_left(dataStorage[len(dataList)], aceDates[len(aceDates)-1])
@@ -1016,20 +1064,30 @@ def dateList(sDate, eDate, shift = 'day'):
     return dList   
 
 def removeNaN(data,epoch=[]):
-    if epoch == []:
+    if epoch == [] and data != []:
      newData=[]
      for i in range(len(data)):
       if str(data[i]) != 'nan':
        newData.extend([data[i]])
      return newData
-    elif epoch != []:
+    elif epoch != [] and len(data) == len(epoch):
      newEpoch=[]; newData=[]
      for i in range(len(epoch)):
       if str(data[i]) != 'nan':
        newEpoch.extend([epoch[i]])
        newData.extend([data[i]])
      return newEpoch,newData
-
+    else
+     return []
+'''
+def removeNaN(data,epoch=[]):
+    newEpoch=[]; newData=[]
+    for i in range(len(epoch)):
+     if str(data[i]) != 'nan':
+      newEpoch.extend([epoch[i]])
+      newData.extend([data[i]])
+    return newEpoch,newData
+'''
 
 def mapDataToEpoch(refEpoch,epoch,data,interpKind='linear'):
     from time import mktime

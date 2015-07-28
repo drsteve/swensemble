@@ -1,83 +1,3 @@
-def findContiguousData(x, delta, minLength=None):
-    import numpy as np
-    import datetime as dt
-    """Find all intervals of contiguous data in x exceeding min_length
-
-    Contiguous data are defined as neighbouring points separated by delta
-    i.e., x[i+1] - x[i] = delta
-
-    If min_length is undefined then min_length = Delta
-    
-    Inputs:
-    =======
-    x, input series of times. Can be datetime objects or serial time
-    delta, expected resolution of x.
-    minLength [defaults to delta], minimum length of contiguous interval required.
-    
-    Returns:
-    ========
-    istart, iend - indices of starts and ends of contiguous blocks
-    
-    Author:
-    =======
-    Original -- Mervyn Freeman, British Antarctic Survey
-    Port to Python by Steve Morley, Los Alamos National Lab.
-    smorley@lanl.gov/morley_steve@hotmail.com
-    """
-
-    if not minLength:
-        minLength = delta
-
-    if type(x)==list:
-        x = np.array(x)
-    #now ensure type consistency of array contents for datetime input
-    if isinstance(x[0], dt.datetime):
-        try:
-            assert type(delta) == type(minLength)
-            assert isinstance(delta, dt.timedelta)
-        except:
-            return 'findContiguousData: inconsistent data types for time objects'
-
-    #Calculate distance between neighbouring data points in array x
-    dx = x[1:]-x[0:-1]
-
-    #Find positions i where X neighbours are non-contiguous
-    #i.e., X(i+1) - X(i) > Delta
-    #Store in array igaps
-    igaps, = (dx > delta).nonzero()
-    igaps1, nigaps = igaps+1, len(igaps)
-
-    #Now find intervals of contiguous data exceeding min_length
-    #Contiguous data interval starts at the end of a non-contiguous interval
-    #and ends at the start of the next non-contiguous interval.
-
-    #Start of series X is start of first potentially contiguous interval
-    istart_c = [0]
-    #Find starts of other potentially contiguous intervals
-    #from ends of non-contiguous intervals
-    end_nc = x[igaps+1].tolist()
-    start_c = end_nc
-    istart_c = igaps1.tolist()
-    start_c.insert(0, x[0])
-    istart_c.insert(0, 0)
-    #Find ends of potentially contiguous intervals
-    #from starts of non-contiguous intervals
-    end_c = x[igaps].tolist() #start_nc
-    iend_c = igaps.tolist()
-    #Add end of series X as end of last potentially contiguous interval
-    end_c.append(x[-1])
-    iend_c.append(len(x)-1)
-
-    #Find lengths of all potentially contiguous intervals
-    length = [cEnd - start_c[i] for i, cEnd in enumerate(end_c)]
-    #Find those whose length exceeds min_length
-    ilong, = (np.array(length) > minLength).nonzero()
-
-    #Return start and end indices of these intervals
-    istart = [istart_c[ind] for ind in ilong]
-    iend = [iend_c[ind] for ind in ilong]
-
-    return istart, iend
 
 def epochBlock(epoch, data, blockLen, gapLen, fixStep = True):
     from numpy import diff
@@ -85,8 +5,8 @@ def epochBlock(epoch, data, blockLen, gapLen, fixStep = True):
     from bisect import bisect_left
     from getswdata import removeNaN
 
-    if len(epoch) != len(data):
-     print '(epoch) length MUST equal (data) length.'
+    if (data != []) and (len(epoch) != len(data)):
+     print '(epoch) length MUST equal (data) length, and length must be greater than (zero).'
      return ''
 
     epochLength = epoch[-1] - epoch[0]
@@ -101,34 +21,39 @@ def epochBlock(epoch, data, blockLen, gapLen, fixStep = True):
      try:
       sEpochID  = bisect_left(epoch, cEpoch + timedelta(0,0))
       eEpochID  = bisect_left(epoch, cEpoch + timedelta(0,blockLen*3600))
+      TT,DD = removeNaN(data[sEpochID:eEpochID],epoch = epoch[sEpochID:eEpochID])
+      dt = max(diff(TT))
+      if dt.seconds <= gapLen:
+       blockstart.append(cEpoch)
+       cEpoch = cEpoch + timedelta(0,blockLen*3600)
      except:
       if fixStep:
        cEpoch = cEpoch + timedelta(0,blockLen*3600)
       else:
        cEpoch = cEpoch + timedelta(0,3600)
       continue
-     TT,DD = removeNaN(data[sEpochID:eEpochID],epoch = epoch[sEpochID:eEpochID])
-     if diff(TT) != []:
-      try:
-       dt = max(diff(TT))
-       if dt.seconds <= gapLen:
-        blockstart.append(cEpoch)
-        cEpoch = cEpoch + timedelta(0,blockLen*3600)
-       else:
-        if fixStep:
-         cEpoch = cEpoch + timedelta(0,blockLen*3600)
-        else:
-         cEpoch = cEpoch + timedelta(0,3600)
-      except:
-       if fixStep:
-        cEpoch = cEpoch + timedelta(0,blockLen*3600)
-       else:
-        cEpoch = cEpoch + timedelta(0,3600)
-     else:
-       if fixStep:
-        cEpoch = cEpoch + timedelta(0,blockLen*3600)
-       else:
-        cEpoch = cEpoch + timedelta(0,3600)
+  #  TT,DD = removeNaN(data[sEpochID:eEpochID],epoch = epoch[sEpochID:eEpochID])
+  #  if diff(TT) != []:
+  #   try:
+  #    dt = max(diff(TT))
+  #    if dt.seconds <= gapLen:
+  #     blockstart.append(cEpoch)
+  #     cEpoch = cEpoch + timedelta(0,blockLen*3600)
+  #    else:
+  #     if fixStep:
+  #      cEpoch = cEpoch + timedelta(0,blockLen*3600)
+  #     else:
+  #      cEpoch = cEpoch + timedelta(0,3600)
+  #   except:
+  #    if fixStep:
+  #     cEpoch = cEpoch + timedelta(0,blockLen*3600)
+  #    else:
+  #     cEpoch = cEpoch + timedelta(0,3600)
+  #  else:
+  #    if fixStep:
+  #     cEpoch = cEpoch + timedelta(0,blockLen*3600)
+  #    else:
+  #     cEpoch = cEpoch + timedelta(0,3600)
 
     return blockstart
 
@@ -426,10 +351,9 @@ def getDesKDE(srcSC,desSC,srcRanges,nPins=10):
      for j in range(len(srcSC)):
       if srcSC[j] >= srcRanges[i][0] and srcSC[j] <= srcRanges[i][1]:
        desRanges[i].extend([desSC[j]])
-     desRanges[i]
     #desRanges[i] = dataClean(desRanges[i],[250],['<'])
     #desRanges[i] = removeNaN(desRanges[i])
-     desRanges[i] = rejectOutliers(array(desRanges[i]))
+     desRanges[i] = rejectOutliers(array(desRanges[i]), m=5.)
      try:
       if len(desRanges[i]) > 1:
        jKDE = gaussian_kde(desRanges[i], bw_method=kdeBW)
@@ -474,7 +398,7 @@ def swMedFilter(swEpoch,swParam,nSeconds):
  
     return swParamMF
 
-def rejectOutliers(data,m=20.):
+def rejectOutliers(data,m=2.):
     from numpy import median
     d = abs(data - median(data))
     mdev = median(d)

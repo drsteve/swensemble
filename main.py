@@ -33,7 +33,7 @@ from scipy.integrate import simps, trapz
 from scipy.stats import ks_2samp, pearsonr, gaussian_kde
 
 from swdatanal import getDistrib, getIndices, omniDataCorr, ccorr, xcorr
-from swdatanal import kdeBW, getDesKDE, findContiguousData
+from swdatanal import kdeBW, getDesKDE
 from swdatanal import search, epochBlock, findCorrEpoch, dataFilter
 from swdatanal import getSolarWindType, getTimeLag, swMedFilter, rejectOutliers
 from getswdata import getOMNIfiles, getOMNIdata, getOMNIparams, omniDataAdjust
@@ -518,7 +518,6 @@ pp = PdfPages('./figures/KDE.pdf')
 for j in range(len(DesKDEALL)):
  fig = plt.figure(701+j,figsize=(10,10))
  if ALLFlag and DesKDEALL[j] != []:
-  print max(DesRangesALL[j]),min(DesRangesALL[j])
   xVals = numpy.linspace(min(DesRangesALL[j]),max(DesRangesALL[j]),nPins)
   plt.plot(xVals,DesKDEALL[j],color='k')
   plt.suptitle('Source Speed Ranges = [' + str(vRanges[j][0]) + ',' + str(vRanges[j][1]) + '] (km/s)', fontsize = 20)
