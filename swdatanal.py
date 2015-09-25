@@ -26,35 +26,16 @@ def epochBlock(epoch, data, blockLen, gapLen, fixStep = True):
       if dt.seconds <= gapLen:
        blockstart.append(cEpoch)
        cEpoch = cEpoch + timedelta(0,blockLen*3600)
+      else:
+       if fixStep:
+        cEpoch = cEpoch + timedelta(0,blockLen*3600)
+       else:
+        cEpoch = cEpoch + timedelta(0,3600)
      except:
       if fixStep:
        cEpoch = cEpoch + timedelta(0,blockLen*3600)
       else:
        cEpoch = cEpoch + timedelta(0,3600)
-      continue
-  #  TT,DD = removeNaN(data[sEpochID:eEpochID],epoch = epoch[sEpochID:eEpochID])
-  #  if diff(TT) != []:
-  #   try:
-  #    dt = max(diff(TT))
-  #    if dt.seconds <= gapLen:
-  #     blockstart.append(cEpoch)
-  #     cEpoch = cEpoch + timedelta(0,blockLen*3600)
-  #    else:
-  #     if fixStep:
-  #      cEpoch = cEpoch + timedelta(0,blockLen*3600)
-  #     else:
-  #      cEpoch = cEpoch + timedelta(0,3600)
-  #   except:
-  #    if fixStep:
-  #     cEpoch = cEpoch + timedelta(0,blockLen*3600)
-  #    else:
-  #     cEpoch = cEpoch + timedelta(0,3600)
-  #  else:
-  #    if fixStep:
-  #     cEpoch = cEpoch + timedelta(0,blockLen*3600)
-  #    else:
-  #     cEpoch = cEpoch + timedelta(0,3600)
-
     return blockstart
 
 def dataFilter(data,filterVal,filterCondition):
@@ -178,14 +159,29 @@ def omniDataCorr(srefDate, erefDate, startDate, endDate, epochs, SWP, binStride,
    
 
 def getSolarWindType(swData,nCats = 4, gplot = True):
-    from  numpy import array, log10, dot, sign
+    from  numpy import array, log10, dot, sign, zeros, float
     import matplotlib.pyplot as plt
     import scipy.constants
 
-    Tp = (scipy.constants.k*array(swData['T']))/scipy.constants.physical_constants['electron volt'][0]
-    Sp = Tp/((array(swData['N']))**0.667)
-    Tr = ((array(swData['V'])/258.0)**3.113)/Tp
-    VA = 21.8*array(swData['B'])/((array(swData['N']))**0.5)
+    TT = array(swData['T'])
+    NN = array(swData['N'])
+    VV = array(swData['V'])
+    BB = array(swData['B'])
+    Tp = zeros(len(TT))
+    Tr = zeros(len(TT))
+    Sp = zeros(len(TT))
+    VA = zeros(len(TT))
+    for ii in range(len(array(swData['T']))):
+     if array(swData['T'][ii]) != 0 and array(swData['N'][ii]) != 0 and array(swData['B'][ii]) != 0 and array(swData['V'][ii]) != 0:
+      Tp[ii] = (scipy.constants.k*array(swData['T'][ii]))/scipy.constants.physical_constants['electron volt'][0]
+      Sp[ii] = Tp[ii]/((array(swData['N'][ii]))**0.667)
+      Tr[ii] = (array(swData['V'][ii])/258.0)**3.113/Tp[ii]
+      VA[ii] = 21.8*array(swData['B'][ii])/(array(swData['N'][ii])**0.5)
+     else:
+      Tp[ii] = float('nan')
+      Sp[ii] = float('nan')
+      Tr[ii] = float('nan')
+      VA[ii] = float('nan')
 
     dx = log10(Sp)
     dy = log10(VA)
@@ -309,27 +305,19 @@ def getTimeLag(epoch,srcData,destPos,method='flat'):
     propgLag=[]
     epochLag=[]
     if method == 'flat':
-     for i in range(len(srcData['epoch'])):
-      if srcData['Vx'][i] != 0:
-       timeLag = srcData['SCxGSE'][i]-destPos['X'][i]
-       timeLag = timeLag/abs(srcData['Vx'][i])
-       propgLag.extend([timeLag])
-       epochLag.extend([epoch[i] + timedelta(0,propgLag[i])])
-      elif srcData['Vx'][i] == 0 and i > 0:
-       propgLag.extend([propgLag[i-1]])
-       epochLag.extend([epoch[i] + timedelta(0,propgLag[i])])
-      elif srcData['Vx'][i] == 0:
-       print 'I found Vx = 0 at index = ', i
+     if srcData['Vx'] != []:
+      for i in range(len(srcData['epoch'])):
+       if srcData['Vx'][i] != 0:
+        timeLag = srcData['SCxGSE'][i]-destPos['X'][i]
+        timeLag = timeLag/abs(srcData['Vx'][i])
+        propgLag.extend([timeLag])
+        epochLag.extend([epoch[i] + timedelta(0,propgLag[i])])
+       elif srcData['Vx'][i] == 0 and i > 0:
+        propgLag.extend([propgLag[i-1]])
+        epochLag.extend([epoch[i] + timedelta(0,propgLag[i])])
+       elif srcData['Vx'][i] == 0:
+        print 'I found Vx = 0 at index = ', i
     return propgLag, epochLag
-
-
-def kdeBW(obj, fac=1./5):
-    from numpy import power
-    """
-       We use Scott's Rule, multiplied by a constant factor 
-       to calculate the KDE Bandwidth.
-    """
-    return power(obj.n, -1./(obj.d+4)) * fac
 
 
 def getIndices(inList, item):
@@ -338,49 +326,82 @@ def getIndices(inList, item):
     return indices
 
 
-def getDesKDE(srcSC,desSC,srcRanges,nPins=10):
+def kdeBW(obj, fac=1./5):
+    from numpy import power
+    """
+       We use Scott's Rule, multiplied by a constant factor to calculate the KDE Bandwidth.
+    """
+    return power(obj.n, -1./(obj.d+4)) * fac
+
+
+def getDesKDE(srcSC,desSC,srcRanges,threshold=0,nPins=10):
     from scipy.stats import gaussian_kde
     from numpy import linspace,array
     desRanges = []
     desKDE = []
     nRanges = len(srcRanges)
+    KDEfunc = []
 
     for i in range(nRanges):
      desRanges.append([])
      desKDE.append([])
+     KDEfunc.append([])
      for j in range(len(srcSC)):
       if srcSC[j] >= srcRanges[i][0] and srcSC[j] <= srcRanges[i][1]:
-       desRanges[i].extend([desSC[j]])
-    #desRanges[i] = dataClean(desRanges[i],[250],['<'])
-    #desRanges[i] = removeNaN(desRanges[i])
-     desRanges[i] = rejectOutliers(array(desRanges[i]), m=5.)
+       if desSC[j] > threshold:
+        desRanges[i].extend([desSC[j]])
+    #desRanges[i] = rejectOutliers(array(desRanges[i]), m=5.)
      try:
       if len(desRanges[i]) > 1:
        jKDE = gaussian_kde(desRanges[i], bw_method=kdeBW)
+       KDEfunc[i] = jKDE
        jVAL = linspace(min(desRanges[i]),max(desRanges[i]),nPins)
        desKDE[i].extend(jKDE(jVAL))
       else:
+       KDEfunc[i] = []
        desKDE[i] = []
      except:
+      KDEfunc[i] = []
       desKDE[i] = []
-    return desRanges,desKDE
-    '''
-    for j in range(nRanges):
-     for i in range(len(srcSC)):
-      if srcSC[i] >= srcRanges[j][0] and srcSC[i] <= srcRanges[j][1]:
-       desRanges[j].extend([desSC[i]])
-     desRanges[j] = rejectOutliers(array(desRanges[j]))
-     try:
-      if len(desRanges[j]) > 1:
-       jKDE = gaussian_kde(desRanges[j], bw_method=kdeBW)
-       jVAL = linspace(min(desRanges[j]),max(desRanges[j]),nPins)
-       desKDE[j].extend(jKDE(jVAL))
-      else:
-       desKDE[j] = []
-     except:
-      desKDE[j] = []
-    return desRanges,desKDE
-    '''
+    return array(desRanges), array(desKDE), KDEfunc
+
+
+def getSWPRange(paramRanges,destParamStd,srcParam,srcEpoch):
+    from numpy import zeros
+
+    epoch=[]
+    pbase=[]
+    ppstd=[]
+    pmstd=[]
+    for j in range(len(srcParam)):
+     for i in range(len(paramRanges)):
+      if srcParam[j] >= paramRanges[i][0] and srcParam[j] <= paramRanges[i][1]:
+       epoch.extend([srcEpoch[j]])
+       pbase.extend([srcParam[j]])
+       ppstd.extend([srcParam[j] + destParamStd[i]])
+       pmstd.extend([srcParam[j] - destParamStd[i]])
+    return ppstd, pbase, pmstd, epoch
+
+def getSurrogate(paramRanges,paramKDE,srcParam,srcEpoch,nSamples=100):
+    import sys
+    sys.path.append('/home/ehab/MyFiles/Softex/spacePy/spacepy-0.1.5')
+    import spacepy.toolbox as tb
+
+    epoch=[]
+    pbase=[]
+    ppstd=[]
+    pmstd=[]
+    for j in range(len(srcParam)):
+     for i in range(len(paramRanges)):
+      if paramKDE[i] != []:
+       if srcParam[j] >= paramRanges[i][0] and srcParam[j] <= paramRanges[i][1]:
+        mad = tb.medAbsDev(paramKDE[i].resample(nSamples)[0])
+        ppstd.extend([srcParam[j] - mad])
+        pmstd.extend([srcParam[j] + mad])
+        epoch.extend([srcEpoch[j]])
+        pbase.extend([srcParam[j]])
+    return ppstd, pbase, pmstd, epoch
+
 
 def swMedFilter(swEpoch,swParam,nSeconds):
     from scipy.signal import medfilt

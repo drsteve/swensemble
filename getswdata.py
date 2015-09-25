@@ -257,7 +257,7 @@ def getACEparams(aceDates,dataLoc,aceSet='hourly',aceDat='magnetic'):
     return cdfKeys
 
 def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
-    from numpy import transpose
+    from numpy import transpose, array
     from spacepy import pycdf
     from bisect import bisect_left
 
@@ -274,16 +274,111 @@ def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
      ACEPparams = getACEparams(aceDates,dataLoc,aceSet='1min',aceDat='plasma')
 
     for j in range(len(dataList)):
-     if dataList[j] in ACEBparams: bpFlag = True
-     if dataList[j] in ACEPparams: ppFlag = True
+     if dataList[j] in ACEBparams: bFlag = True
+     if dataList[j] in ACEPparams: pFlag = True
 
-    if bpFlag:
+    dataStorage = []
+
+    if bFlag and pFlag:
+     bpFlag = True; bFlag  = False; pFlag  = False
      ACEBfnames = getACEfiles(aceDates,dataLoc,aceSet[0],aceDat='magnetic')
-    if ppFlag:
      if len(aceSet) == 2:
       ACEPfnames = getACEfiles(aceDates,dataLoc,aceSet[1],aceDat='plasma')
      elif len(aceSet) == 1:
       ACEPfnames = getACEfiles(aceDates,dataLoc,aceSet='1min',aceDat='plasma')
+
+     for j in range(len(dataList)+2):
+      dataStorage.append([])
+
+     for i in range(len(ACEBfnames)):
+      cdf = pycdf.CDF(ACEBfnames[i])
+      dataStorage[len(dataList)].extend(list(cdf['Epoch']))
+      for j in range(len(dataList)):
+       if dataList[j] in ACEBparams:
+        dataStorage[j].extend(list(cdf[dataList[j]]))
+      cdf.close()
+
+     for i in range(len(ACEPfnames)):
+      cdf = pycdf.CDF(ACEPfnames[i])
+      dataStorage[len(dataList)+1].extend(list(cdf['Epoch']))
+      for j in range(len(dataList)):
+       if dataList[j] in ACEPparams:
+        dataStorage[j].extend(list(cdf[dataList[j]]))
+      cdf.close()
+
+     sEpochBID  = bisect_left(dataStorage[len(dataList)], aceDates[0])
+     eEpochBID  = bisect_left(dataStorage[len(dataList)], aceDates[len(aceDates)-1])
+     sEpochPID  = bisect_left(dataStorage[len(dataList)+1], aceDates[0])
+     eEpochPID  = bisect_left(dataStorage[len(dataList)+1], aceDates[len(aceDates)-1])
+     swData = {'magneticEpoch':dataStorage[len(dataList)][sEpochBID:eEpochBID], 'plasmaEpoch':dataStorage[len(dataList)+1][sEpochPID:eEpochPID]}
+
+    elif bFlag:
+     ACEBfnames = getACEfiles(aceDates,dataLoc,aceSet[0],aceDat='magnetic')
+
+     for j in range(len(dataList)+1):
+      dataStorage.append([])
+
+     for i in range(len(ACEBfnames)):
+      cdf = pycdf.CDF(ACEBfnames[i])
+      dataStorage[len(dataList)].extend(list(cdf['Epoch']))
+      for j in range(len(dataList)):
+       if dataList[j] in ACEBparams:
+        dataStorage[j].extend(list(cdf[dataList[j]]))
+      cdf.close()
+     sEpochBID  = bisect_left(dataStorage[len(dataList)], aceDates[0])
+     eEpochBID  = bisect_left(dataStorage[len(dataList)], aceDates[len(aceDates)-1])
+     swData = {'magneticEpoch':dataStorage[len(dataList)][sEpochBID:eEpochBID]}
+
+    elif pFlag:
+     if len(aceSet) == 2:
+      ACEPfnames = getACEfiles(aceDates,dataLoc,aceSet[1],aceDat='plasma')
+     elif len(aceSet) == 1:
+      ACEPfnames = getACEfiles(aceDates,dataLoc,aceSet='1min',aceDat='plasma')
+
+     for j in range(len(dataList)+1):
+      dataStorage.append([])
+
+     for i in range(len(ACEPfnames)):
+      cdf = pycdf.CDF(ACEPfnames[i])
+      dataStorage[len(dataList)].extend(list(cdf['Epoch']))
+      for j in range(len(dataList)):
+       if dataList[j] in ACEPparams:
+        dataStorage[j].extend(list(cdf[dataList[j]]))
+      cdf.close()
+     sEpochPID  = bisect_left(dataStorage[len(dataList)], aceDates[0])
+     eEpochPID  = bisect_left(dataStorage[len(dataList)], aceDates[len(aceDates)-1])
+     swData = {'plasmaEpoch':dataStorage[len(dataList)][sEpochPID:eEpochPID]}
+
+    for j in range(len(dataList)):
+     if dataList[j] in ['BGSEc','V_GSE','SC_pos_GSE']:
+      swDataTMP = transpose(dataStorage[j])
+      if dataList[j] in ACEBparams:
+       swData[dataList[j]] = [swDataTMP[0][sEpochBID:eEpochBID],swDataTMP[1][sEpochBID:eEpochBID],swDataTMP[2][sEpochBID:eEpochBID]]
+       if dataStat == 'clean':
+        if dataList[j] == 'BGSEc':
+         swData[dataList[j]][0] = dataClean(swData[dataList[j]][0],[999,-999],['>','<'])
+         swData[dataList[j]][1] = dataClean(swData[dataList[j]][1],[999,-999],['>','<'])
+         swData[dataList[j]][2] = dataClean(swData[dataList[j]][2],[999,-999],['>','<'])
+      elif dataList[j] in ACEPparams:
+       swData[dataList[j]] = [swDataTMP[0][sEpochPID:eEpochPID],swDataTMP[1][sEpochPID:eEpochPID],swDataTMP[2][sEpochPID:eEpochPID]]
+       if dataStat == 'clean':
+        if dataList[j] == 'V_GSE':
+         swData[dataList[j]][0] = dataClean(abs(swData[dataList[j]][0]),[2500,100],['>','<'])
+         swData[dataList[j]][1] = dataClean(abs(swData[dataList[j]][1]),[2500,100],['>','<'])
+         swData[dataList[j]][2] = dataClean(abs(swData[dataList[j]][2]),[2500,100],['>','<'])
+     else:
+      if dataList[j] in ACEBparams:
+       swData[dataList[j]] = dataStorage[j][sEpochBID:eEpochBID]
+      elif dataList[j] in ACEPparams:
+       swData[dataList[j]] = dataStorage[j][sEpochPID:eEpochPID]
+      if dataStat == 'clean':
+       if dataList[j] == 'Np': swData[dataList[j]] = dataClean(swData[dataList[j]],[999,0],['>=','<='])
+       if dataList[j] == 'Vp': swData[dataList[j]] = dataClean(swData[dataList[j]],[2500,100],['>','<'])
+       if dataList[j] == 'Magnitude': swData[dataList[j]] = dataClean(swData[dataList[j]],[-999,0,999],['<=','=','>='])
+       if dataList[j] == 'Tpr': swData[dataList[j]] = dataClean(swData[dataList[j]],[1e8,0],['>=','<='])
+
+    return swData
+
 
 '''
     if len(aceSet) == 2:
@@ -299,7 +394,6 @@ def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
      ACEBparams = getACEparams(aceDates,dataLoc,aceSet[0],aceDat='magnetic')
      ACEPfnames = getACEfiles(aceDates,dataLoc,aceSet='1min',aceDat='plasma')
      ACEPparams = getACEparams(aceDates,dataLoc,aceSet='1min',aceDat='plasma')
-'''
     dataStorage = []
     for j in range(len(dataList)+2):
      dataStorage.append([])
@@ -308,26 +402,6 @@ def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
      if dataList[j] in ACEBparams: bpFlag = True
      if dataList[j] in ACEPparams: ppFlag = True
 
-    if bpFlag:
-     for i in range(len(ACEBfnames)):
-      cdf = pycdf.CDF(ACEBfnames[i])
-      dataStorage[len(dataList)].extend(list(cdf['Epoch']))
-      for j in range(len(dataList)):
-       if dataList[j] in ACEBparams:
-        dataStorage[j].extend(list(cdf[dataList[j]]))
-      cdf.close()
-
-    if ppFlag:
-     for i in range(len(ACEPfnames)):
-      cdf = pycdf.CDF(ACEPfnames[i])
-      dataStorage[len(dataList)+1].extend(list(cdf['Epoch']))
-      for j in range(len(dataList)):
-       if dataList[j] in ACEPparams:
-        dataStorage[j].extend(list(cdf[dataList[j]]))
-      cdf.close()
-
-
-'''
     bFlage = True
     pFlage = True
     for j in range(len(dataList)):
@@ -347,7 +421,6 @@ def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
       cdf.close()
      else:
        print dataList[j], ' is not available in ACE CDF File!'
-'''
 
     sEpochBID  = bisect_left(dataStorage[len(dataList)], aceDates[0])
     eEpochBID  = bisect_left(dataStorage[len(dataList)], aceDates[len(aceDates)-1])
@@ -355,39 +428,7 @@ def getACEdata(aceDates,dataLoc,dataList,aceSet=['1sec','1min'],dataStat='raw'):
     eEpochPID  = bisect_left(dataStorage[len(dataList)+1], aceDates[len(aceDates)-1])
 
     swData = {'magneticEpoch':dataStorage[len(dataList)][sEpochBID:eEpochBID], 'plasmaEpoch':dataStorage[len(dataList)+1][sEpochPID:eEpochPID]}
-    for j in range(len(dataList)):
-     if dataList[j] in ['BGSEc','V_GSE','SC_pos_GSE']:
-      swDataTMP = transpose(dataStorage[j])
-      if dataList[j] in ACEBparams:
-       swData[dataList[j]] = [swDataTMP[0][sEpochBID:eEpochBID],swDataTMP[1][sEpochBID:eEpochBID],swDataTMP[2][sEpochBID:eEpochBID]]
-       if dataStat == 'clean':
-        if dataList[j] == 'BGSEc':
-         swData[dataList[j]][0] = dataClean(swData[dataList[j]][0],[999,-999],['>','<'])
-         swData[dataList[j]][1] = dataClean(swData[dataList[j]][1],[999,-999],['>','<'])
-         swData[dataList[j]][2] = dataClean(swData[dataList[j]][2],[999,-999],['>','<'])
-      elif dataList[j] in ACEPparams:
-       swData[dataList[j]] = [swDataTMP[0][sEpochPID:eEpochPID],swDataTMP[1][sEpochPID:eEpochPID],swDataTMP[2][sEpochPID:eEpochPID]]
-       if dataStat == 'clean':
-        if dataList[j] == 'V_GSE':
-        #swData[dataList[j]][0] = dataClean(swData[dataList[j]][0],[2500,0,-2500],['>','=','<'])
-        #swData[dataList[j]][1] = dataClean(swData[dataList[j]][1],[2500,0,-2500],['>','=','<'])
-        #swData[dataList[j]][2] = dataClean(swData[dataList[j]][2],[2500,0,-2500],['>','=','<'])
-         swData[dataList[j]][0] = dataClean(abs(swData[dataList[j]][0]),[2500,250],['>','<'])
-         swData[dataList[j]][1] = dataClean(abs(swData[dataList[j]][1]),[2500,250],['>','<'])
-         swData[dataList[j]][2] = dataClean(abs(swData[dataList[j]][2]),[2500,250],['>','<'])
-     else:
-      if dataList[j] in ACEBparams:
-       swData[dataList[j]] = dataStorage[j][sEpochBID:eEpochBID]
-      elif dataList[j] in ACEPparams:
-       swData[dataList[j]] = dataStorage[j][sEpochPID:eEpochPID]
-      if dataStat == 'clean':
-       if dataList[j] == 'Np': swData[dataList[j]] = dataClean(swData[dataList[j]],[999,0],['>=','<='])
-       if dataList[j] == 'Vp': swData[dataList[j]] = dataClean(swData[dataList[j]],[2500,250],['>','<'])
-       if dataList[j] == 'Magnitude': swData[dataList[j]] = dataClean(swData[dataList[j]],[-999,0,999],['<=','=','>='])
-       if dataList[j] == 'Tpr': swData[dataList[j]] = dataClean(swData[dataList[j]],[1e8,0],['>=','<='])
-
-    return swData
-
+'''
 
 def aceDataAdjust(Data,epoch=[],epochLen='not fixed'):
     import numpy
@@ -531,7 +572,7 @@ def getIMP8params(imp8Dates,dataLoc,imp8Set='15sec',imp8Dat='magnetic'):
     return cdfKeys
 
 def getIMP8data(imp8Dates,dataLoc,dataList,imp8Set='15sec',dataStat='raw'):
-    from numpy import transpose
+    from numpy import transpose, array
     from spacepy import pycdf
     from bisect import bisect_left
 
@@ -593,13 +634,13 @@ def getIMP8data(imp8Dates,dataLoc,dataList,imp8Set='15sec',dataStat='raw'):
        swData[dataList[j]] = dataStorage[j][sEpochPID:eEpochPID]
       if dataStat == 'clean':
        if dataList[j] == 'proton_density_fit':
-        swData[dataList[j]] = dataClean(swData[dataList[j]],[999,0,-999],['>=','=','<='])
+        swData[dataList[j]] = dataClean(swData[dataList[j]],[99,0],['>=','<='])
        elif dataList[j] == 'protonV_thermal_fit':
-        swData[dataList[j]] = dataClean(swData[dataList[j]],[99,0,-99],['>=','=','<='])
+        swData[dataList[j]] = dataClean(swData[dataList[j]],[79,0],['>=','<='])
        elif dataList[j] == 'protonV_thermal_mom':
-        swData[dataList[j]] = dataClean(swData[dataList[j]],[99,0,-99],['>=','=','<='])
+        swData[dataList[j]] = dataClean(swData[dataList[j]],[79,0],['>=','<='])
        elif dataList[j] == 'V_fit':
-        swData[dataList[j]] = dataClean(swData[dataList[j]],[2500,250],['>','<'])
+        swData[dataList[j]] = dataClean(swData[dataList[j]],[2500,100],['>=','<='])
 
     return swData
 
@@ -636,23 +677,23 @@ def imp8DataAdjust(Data,epoch=[],epochLen='not fixed'):
      DataAdj['SCxGSE'] = array(Data['SC_Pos_GSE'][0])*RE
      DataAdj['SCyGSE'] = array(Data['SC_Pos_GSE'][1])*RE
      DataAdj['SCzGSE'] = array(Data['SC_Pos_GSE'][2])*RE
-     DataAdj['N']      = array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],Data['proton_density_fit'],interpKind='cubic'))
-     DataAdj['V']      = array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],Data['V_fit'],interpKind='cubic'))
-     DataAdj['T']      = array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],(mi/KB)*(Data['protonV_thermal_fit']*1000.0)**2,interpKind='cubic'))
+     DataAdj['N']      = array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],Data['proton_density_fit'],interpKind='linear'))
+     DataAdj['V']      = array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],Data['V_fit'],interpKind='linear'))
+     DataAdj['T']      = array(epochMatch(aceDataAdj['epoch'],Data['plasmaEpoch'],(mi/KB)*(Data['protonV_thermal_fit']*1000.0)**2,interpKind='linear'))
     elif epochLen == 'fixed' and epoch != []:
      DataAdj={'epoch':epoch}
-     DataAdj['Bx']     = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['B_Vector_GSE'][0],interpKind='cubic'))
-     DataAdj['By']     = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['B_Vector_GSE'][1],interpKind='cubic'))
-     DataAdj['Bz']     = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['B_Vector_GSE'][2],interpKind='cubic'))
+     DataAdj['Bx']     = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['B_Vector_GSE'][0],interpKind='linear'))
+     DataAdj['By']     = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['B_Vector_GSE'][1],interpKind='linear'))
+     DataAdj['Bz']     = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['B_Vector_GSE'][2],interpKind='linear'))
      for i in range(len(DataAdj['Bx'])):
       BB.extend([math.sqrt(DataAdj['Bx'][i]**2+DataAdj['By'][i]**2+DataAdj['Bz'][i]**2)])
      DataAdj['B']      = array(BB)
-     DataAdj['SCxGSE'] = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][0],interpKind='cubic'))*RE
-     DataAdj['SCyGSE'] = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][1],interpKind='cubic'))*RE
-     DataAdj['SCzGSE'] = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][2],interpKind='cubic'))*RE
-     DataAdj['N']      = array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['proton_density_fit'],interpKind='cubic'))
-     DataAdj['V']      = array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['V_fit'],interpKind='cubic'))
-     DataAdj['T']      = array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],(mi/KB)*(Data['protonV_thermal_fit']*1000.0)**2,interpKind='cubic'))
+     DataAdj['SCxGSE'] = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][0],interpKind='linear'))*RE
+     DataAdj['SCyGSE'] = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][1],interpKind='linear'))*RE
+     DataAdj['SCzGSE'] = array(epochMatch(DataAdj['epoch'],Data['magneticEpoch'],Data['SC_Pos_GSE'][2],interpKind='linear'))*RE
+     DataAdj['N']      = array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['proton_density_fit'],interpKind='linear'))
+     DataAdj['V']      = array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],Data['V_fit'],interpKind='linear'))
+     DataAdj['T']      = array(epochMatch(DataAdj['epoch'],Data['plasmaEpoch'],(mi/KB)*(Data['protonV_thermal_fit']*1000.0)**2,interpKind='linear'))
     else:
      DataAdj={'plasmaEpoch':Data['plasmaEpoch'],'magneticEpoch':Data['magneticEpoch']}
      DataAdj['Bx']     = array(Data['B_Vector_GSE'][0])
@@ -1069,7 +1110,7 @@ def removeNaN(data,epoch=[]):
      for i in range(len(data)):
       if str(data[i]) != 'nan':
        newData.extend([data[i]])
-     return newData
+     return newData, []
     elif epoch != [] and len(data) == len(epoch):
      newEpoch=[]; newData=[]
      for i in range(len(epoch)):
@@ -1077,8 +1118,9 @@ def removeNaN(data,epoch=[]):
        newEpoch.extend([epoch[i]])
        newData.extend([data[i]])
      return newEpoch,newData
-    else
-     return []
+    else:
+     return [], []
+
 '''
 def removeNaN(data,epoch=[]):
     newEpoch=[]; newData=[]

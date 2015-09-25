@@ -2,9 +2,6 @@ import os
 import sys
 sys.path.append('/home/ehab/MyFiles/Softex/spacePy/spacepy-0.1.5')
 
-from matplotlib import *
-import matplotlib
-matplotlib.use('Agg')
 from matplotlib.backends.backend_pdf import *
 
 import json
@@ -33,7 +30,7 @@ from scipy.integrate import simps, trapz
 from scipy.stats import ks_2samp, pearsonr, gaussian_kde
 
 from swdatanal import getDistrib, getIndices, omniDataCorr, ccorr, xcorr
-from swdatanal import kdeBW, getDesKDE
+from swdatanal import kdeBW, getDesKDE, getSWPRange, getSurrogate
 from swdatanal import search, epochBlock, findCorrEpoch, dataFilter
 from swdatanal import getSolarWindType, getTimeLag, swMedFilter, rejectOutliers
 from getswdata import getOMNIfiles, getOMNIdata, getOMNIparams, omniDataAdjust
@@ -44,104 +41,127 @@ from getswdata import getGeotailfiles,getGeotaildata, getGeotailparams, geotailD
 from getswdata import dataClean, dateShift, dateList, mapDataToEpoch, epochShift, commonEpoch, removeNaN
 
 
-startDate   = datetime.datetime(1998, 7, 1, 0, 0, 0)
-endDate     = datetime.datetime(2000, 7,31,23,59,59)
+startDate   = datetime.datetime(1998, 1, 1, 0, 0, 0)
+endDate     = datetime.datetime(2000,12,31,23,59,59)
 locDateList = dateList(startDate, endDate, shift = 'hour')
 
-dataSRC = ""
+GeotailDataFlag = False
+WindDataFlag = False
+IMP8DataFlag = True
+ACEDataFlag = True
+OMNIDataFlag = False
 
-#dataSRC = 'geotail'
-if dataSRC == 'geotail':
- geotailParams = getGeotailparams(locDateList,'/home/ehab/SWData',geotailSet='1min')
-#if geotailParams != '--empty--':
-# swParams = ['V','N','T','BX_GSE','BY_GSE','BZ_GSE','ABS_B','X','Y','Z','VX_GSE','VY_GSE','VZ_GSE']
-# geotailData = getGeotaildata(locDateList,'/home/ehab/SWData',swParams,geotailSet='1min',dataStat='clean')
-# geotailData = geotailDataAdjust(geotailData)
+if GeotailDataFlag:
+ dataSRC = 'geotail'
 
-#dataSRC = 'wind'
-if dataSRC == 'wind':
+#swParams = ['V','N','T','BX_GSE','BY_GSE','BZ_GSE','ABS_B','X','Y','Z','VX_GSE','VY_GSE','VZ_GSE']
+#geotailData = getGeotaildata(locDateList,'/home/ehab/SWData',swParams,geotailSet='1min',dataStat='clean')
+#geotailData = geotailDataAdjust(geotailData)
+
+if WindDataFlag:
+ dataSRC = 'wind'
  windParams = getWINDparams(locDateList,'/home/ehab/SWData',windSet='1min',windDat='merged')
-#if windParams != '--empty--':
-# swParams = ['BX','BY','BZ','Proton_Np_nonlin','Proton_V_nonlin','Proton_VX_nonlin','Proton_VY_nonlin','Proton_VZ_nonlin','Proton_W_nonlin','xgse','ygse','zgse']
-# windData = getWINDdata(locDateList,'/home/ehab/SWData',swParams,windSet='1min',windDat='merged',dataStat='clean')
-# windData = windDataAdjust(windData)
 
-dataSRC = 'imp8'
-if dataSRC == 'imp8':
+#swParams = ['BX','BY','BZ','Proton_Np_nonlin','Proton_V_nonlin','Proton_VX_nonlin','Proton_VY_nonlin','Proton_VZ_nonlin','Proton_W_nonlin','xgse','ygse','zgse']
+#windData = getWINDdata(locDateList,'/home/ehab/SWData',swParams,windSet='1min',windDat='merged',dataStat='clean')
+#windData = windDataAdjust(windData)
+
+if IMP8DataFlag:
+ dataSRC = 'imp8'
 #imp8Params = getIMP8params(locDateList,'/home/ehab/SWData','15sec',imp8Dat='magnetic')
 #imp8Params = getIMP8params(locDateList,'/home/ehab/SWData','1min',imp8Dat='plasma')
-#if imp8Params != '--empty--':
-  swParams = ['B_Vector_GSE','proton_density_fit','V_fit','protonV_thermal_fit','protonV_thermal_mom','SC_Pos_GSE','SC_Pos_GSM']
-  print('Reading IMP8 Dataset')
-  imp8Data = getIMP8data(locDateList,'/home/ehab/SWData',swParams,imp8Set='15sec',dataStat='clean')
-  print('Adjusting IMP8 Dataset')
-  imp8Data = imp8DataAdjust(imp8Data)
 
-dataSRC = 'ace'
-if dataSRC == 'ace':
+ swParams = ['B_Vector_GSE','proton_density_fit','V_fit','protonV_thermal_fit','protonV_thermal_mom','SC_Pos_GSE','SC_Pos_GSM']
+ print('Reading IMP8 Dataset')
+ imp8Data = getIMP8data(locDateList,'/home/ehab/SWData',swParams,imp8Set='15sec',dataStat='clean')
+ print('Adjusting IMP8 Dataset')
+ imp8Data = imp8DataAdjust(imp8Data)
+
+if ACEDataFlag:
+ dataSRC = 'ace'
 #aceParams = getACEparams(locDateList,'/home/ehab/SWData',aceSet='16sec',aceDat='magnetic')
 #aceParams = getACEparams(locDateList,'/home/ehab/SWData',aceSet='1min',aceDat='plasma')
-#if aceParams != '--empty--':
-  swParams = ['Magnitude','Np','Vp','Tpr','BGSEc','V_GSE','SC_pos_GSE']
-  print('Reading ACE Dataset')
-  aceData  = getACEdata(locDateList,'/home/ehab/SWData',swParams,['16sec','1min'],dataStat='clean')
-  print('Adjusting ACE Dataset')
-  aceData  = aceDataAdjust(aceData)
- #swClass = getSolarWindType(aceData)
 
-#dataSRC = 'omni'
-if dataSRC == 'omni':
- omniParams = getOMNIparams(locDateList,'/home/ehab/SWData',omniSet='hourly')
- if omniParams != '--empty--':
- #swParams = ['proton_density','flow_speed','T','ABS_B','BX_GSE','BY_GSE','BZ_GSE','Vx','Vy','Vz']
-  swParams = ['V','N','T','ABS_B','BX_GSE','BY_GSE','BZ_GSE']
-  omniData  = getOMNIdata(locDateList,'/home/ehab/SWData',swParams,omniSet='hourly',dataStat='clean')
-  omniData  = omniDataAdjust(omniData)
-  swClass = getSolarWindType(omniData,nCats=3)
+ swParams = ['Magnitude','Np','Vp','Tpr','BGSEc','V_GSE','SC_pos_GSE']
+ print('Reading ACE Dataset')
+ aceData  = getACEdata(locDateList,'/home/ehab/SWData',swParams,['16sec','1min'],dataStat='clean')
+ print('Adjusting ACE Dataset')
+ aceData  = aceDataAdjust(aceData)
+#swClass = getSolarWindType(aceData)
 
- '''
- plt.subplot(4,1,1)
- plt.plot(imp8Data['plasmaEpoch'],imp8Data['V'],'o')
- plt.title('Solar Wind Parameters at IMP8')
- plt.ylabel('$\upsilon_p$ (km/s)')
- plt.subplot(4,1,2)
- plt.plot(imp8Data['plasmaEpoch'],imp8Data['N'],'o')
- plt.ylabel('$n_p$ (N/cc)')
- plt.subplot(4,1,3)
- plt.plot(imp8Data['plasmaEpoch'],imp8Data['T'],'o')
- plt.ylabel('$T_p$ (K)')
- plt.subplot(4,1,4)
- plt.plot(imp8Data['magneticEpoch'],imp8Data['Bz'],'o')
- plt.ylabel('$B_z$ (nT)')
- plt.show()
- sys.exit()
+if OMNIDataFlag:
+ dataSRC = 'omni'
+#omniParams = getOMNIparams(locDateList,'/home/ehab/SWData',omniSet='hourly')
 
- RE = 6371.0
- plt.figure(200,figsize=(20,10))
- plt.subplot(3,1,1)
- plt.plot(imp8Data['magneticEpoch'],imp8Data['SCxGSE']/RE,label='IMP8')
- plt.plot( aceData['magneticEpoch'], aceData['SCxGSE']/RE,label='ACE')
- plt.ylabel('X-Position ($R_E$)')
- plt.title('ACE and IMP8 Location')
- plt.legend(loc='best')
- plt.subplot(3,1,2)
- plt.plot(imp8Data['magneticEpoch'],imp8Data['SCyGSE']/RE,label='Imp8')
- plt.plot( aceData['magneticEpoch'], aceData['SCyGSE']/RE,label='ACE')
- plt.ylabel('Y-Position ($R_E$)')
- plt.legend(loc='best')
- plt.subplot(3,1,3)
- plt.plot(imp8Data['magneticEpoch'],imp8Data['SCzGSE']/RE,label='IMP8')
- plt.plot( aceData['magneticEpoch'], aceData['SCzGSE']/RE,label='ACE')
- plt.ylabel('Z-Position ($R_E$)')
- plt.xlabel('Epoch Time')
- plt.legend(loc='best')
- plt.show()
- sys.exit()
- '''
+#swParams = ['proton_density','flow_speed','T','ABS_B','BX_GSE','BY_GSE','BZ_GSE','Vx','Vy','Vz']
+ swParams = ['V','N','T','ABS_B','BX_GSE','BY_GSE','BZ_GSE']
+ omniData  = getOMNIdata(locDateList,'/home/ehab/SWData',swParams,omniSet='hourly',dataStat='clean')
+ omniData  = omniDataAdjust(omniData)
+ swClass = getSolarWindType(omniData,nCats=3)
+
+'''
+pp = PdfPages('./figures/TMP/plot.pdf')
+fig = plt.figure(100)
+ax=plt.subplot(4,1,1)
+plt.plot(imp8Data['plasmaEpoch'],imp8Data['V'])
+plt.plot( aceData['plasmaEpoch'], aceData['V'])
+plt.title('Solar Wind Parameters at IMP8')
+plt.ylabel('$\upsilon_p$ (km/s)')
+ax.xaxis.set_major_formatter(plt.NullFormatter())
+ax=plt.subplot(4,1,2)
+plt.plot(imp8Data['plasmaEpoch'],imp8Data['N'])
+plt.plot( aceData['plasmaEpoch'], aceData['N'])
+plt.ylabel('$n_p$ (N/cc)')
+ax.xaxis.set_major_formatter(plt.NullFormatter())
+ax=plt.subplot(4,1,3)
+plt.plot(imp8Data['plasmaEpoch'],imp8Data['T'])
+plt.plot( aceData['plasmaEpoch'], aceData['T'])
+plt.ylabel('$T_p$ (K)')
+ax.xaxis.set_major_formatter(plt.NullFormatter())
+ax=plt.subplot(4,1,4)
+plt.plot(imp8Data['magneticEpoch'],imp8Data['Bz'])
+plt.plot( aceData['magneticEpoch'], aceData['Bz'])
+plt.ylabel('$B_z$ (nT)')
+pp.savefig(fig)
+pp.close()
+
+RE = 6371.0
+plt.figure(200,figsize=(20,10))
+plt.subplot(3,1,1)
+plt.plot(imp8Data['magneticEpoch'],imp8Data['SCxGSE']/RE,label='IMP8')
+plt.plot( aceData['magneticEpoch'], aceData['SCxGSE']/RE,label='ACE')
+plt.ylabel('X-Position ($R_E$)')
+plt.title('ACE and IMP8 Location')
+plt.legend(loc='best')
+plt.subplot(3,1,2)
+plt.plot(imp8Data['magneticEpoch'],imp8Data['SCyGSE']/RE,label='Imp8')
+plt.plot( aceData['magneticEpoch'], aceData['SCyGSE']/RE,label='ACE')
+plt.ylabel('Y-Position ($R_E$)')
+plt.legend(loc='best')
+plt.subplot(3,1,3)
+plt.plot(imp8Data['magneticEpoch'],imp8Data['SCzGSE']/RE,label='IMP8')
+plt.plot( aceData['magneticEpoch'], aceData['SCzGSE']/RE,label='ACE')
+plt.ylabel('Z-Position ($R_E$)')
+plt.xlabel('Epoch Time')
+plt.legend(loc='best')
+plt.show()
+sys.exit()
+'''
+
 timeShift = 4
 timeGap = 900
 
 refBlockStart = []
+print('Filtering IMP8 Valid Epoch')
+pBlockStart = epochBlock(imp8Data['plasmaEpoch'], imp8Data['V'], blockLen = timeShift, gapLen = timeGap, fixStep = True)
+refBlockStart = findCorrEpoch(pBlockStart,pBlockStart)
+pBlockStart = epochBlock(imp8Data['plasmaEpoch'], imp8Data['N'], blockLen = timeShift, gapLen = timeGap, fixStep = True)
+refBlockStart = findCorrEpoch(refBlockStart,pBlockStart)
+pBlockStart = epochBlock(imp8Data['plasmaEpoch'], imp8Data['T'], blockLen = timeShift, gapLen = timeGap, fixStep = True)
+refBlockStart = findCorrEpoch(refBlockStart,pBlockStart)
+pBlockStart = epochBlock(imp8Data['magneticEpoch'], imp8Data['Bz'], blockLen = timeShift, gapLen = timeGap, fixStep = True)
+refBlockStart = findCorrEpoch(refBlockStart,pBlockStart)
+
 print('Filtering ACE Valid Epoch')
 pBlockStart = epochBlock(aceData['plasmaEpoch'], aceData['Vx'], blockLen = timeShift, gapLen = timeGap, fixStep = True)
 refBlockStart = findCorrEpoch(refBlockStart,pBlockStart)
@@ -152,16 +172,6 @@ refBlockStart = findCorrEpoch(refBlockStart,pBlockStart)
 pBlockStart = epochBlock(aceData['plasmaEpoch'], aceData['T'], blockLen = timeShift, gapLen = timeGap, fixStep = True)
 refBlockStart = findCorrEpoch(refBlockStart,pBlockStart)
 pBlockStart = epochBlock(aceData['magneticEpoch'], aceData['Bz'], blockLen = timeShift, gapLen = timeGap, fixStep = True)
-refBlockStart = findCorrEpoch(refBlockStart,pBlockStart)
-
-print('Filtering IMP8 Valid Epoch')
-pBlockStart = epochBlock(imp8Data['plasmaEpoch'], imp8Data['V'], blockLen = timeShift, gapLen = timeGap, fixStep = True)
-refBlockStart = findCorrEpoch(pBlockStart,pBlockStart)
-pBlockStart = epochBlock(imp8Data['plasmaEpoch'], imp8Data['N'], blockLen = timeShift, gapLen = timeGap, fixStep = True)
-refBlockStart = findCorrEpoch(refBlockStart,pBlockStart)
-pBlockStart = epochBlock(imp8Data['magneticEpoch'], imp8Data['Bz'], blockLen = timeShift, gapLen = timeGap, fixStep = True)
-refBlockStart = findCorrEpoch(refBlockStart,pBlockStart)
-pBlockStart = epochBlock(imp8Data['plasmaEpoch'], imp8Data['T'], blockLen = timeShift, gapLen = timeGap, fixStep = True)
 refBlockStart = findCorrEpoch(refBlockStart,pBlockStart)
 
 for iBlock in refBlockStart:
@@ -236,7 +246,7 @@ for i in range(len(sTime)):
   for ind in range(len(aceVxmod)):
    if abs(aceVxmod[ind]) > 0.0: break
 
-  uniDateList = uniDateList[ind:-ind:1]
+  uniDateList = uniDateList[ind:-ind-1:1]
 
   impVmod     = impVmod[ind:-ind:1]
   impNmod     = impNmod[ind:-ind:1]
@@ -257,7 +267,7 @@ for i in range(len(sTime)):
   aceVxmod    = aceVxmod[ind:-ind:1]
   aceBzmod    = aceBzmod[ind:-ind:1]
 
-  MedFilterTS = 20
+  MedFilterTS = 30
   imp8DataMD = {'epoch':uniDateList}
   imp8DataMD['V'] = swMedFilter(imp8DataMD['epoch'],impVmod,MedFilterTS*60)
   imp8DataMD['N'] = swMedFilter(imp8DataMD['epoch'],impNmod,MedFilterTS*60)
@@ -308,20 +318,20 @@ for i in range(len(sTime)):
  '''
 
  SCMatchData          = {'impEpoch':cmnEpoch,'aceEpoch':uniDateList[0:len(cmnEpoch)]}
- SCMatchData['impV']  = [impVmod[ind] for ind in indEpoch]
- SCMatchData['impN']  = [impNmod[ind] for ind in indEpoch]
- SCMatchData['impT']  = [impTmod[ind] for ind in indEpoch]
- SCMatchData['impBz'] = [impBzmod[ind] for ind in indEpoch]
+ SCMatchData['impV']  = [impVmod[item] for item in indEpoch]
+ SCMatchData['impN']  = [impNmod[item] for item in indEpoch]
+ SCMatchData['impT']  = [impTmod[item] for item in indEpoch]
+ SCMatchData['impBz'] = [impBzmod[item] for item in indEpoch]
  SCMatchData['aceV']  = aceVmod[0:len(cmnEpoch)] 
  SCMatchData['aceN']  = aceNmod[0:len(cmnEpoch)] 
  SCMatchData['aceT']  = aceTmod[0:len(cmnEpoch)] 
  SCMatchData['aceBz'] = aceBzmod[0:len(cmnEpoch)] 
 
  accDesE.extend(cmnEpoch)
- accDesV.extend([impVmod[ind] for ind in indEpoch])
- accDesN.extend([impNmod[ind] for ind in indEpoch])
- accDesT.extend([impTmod[ind] for ind in indEpoch])
- accDesB.extend([impBmod[ind] for ind in indEpoch])
+ accDesV.extend([impVmod[item] for item in indEpoch])
+ accDesN.extend([impNmod[item] for item in indEpoch])
+ accDesT.extend([impTmod[item] for item in indEpoch])
+ accDesB.extend([impBmod[item] for item in indEpoch])
 
  accSrcE.extend(uniDateList[0:len(cmnEpoch)])
  accSrcV.extend(aceVmod[0:len(cmnEpoch)])
@@ -329,7 +339,7 @@ for i in range(len(sTime)):
  accSrcT.extend(aceTmod[0:len(cmnEpoch)])
  accSrcB.extend(aceBmod[0:len(cmnEpoch)])
 
- '''
+ pp400 = PdfPages('./figures/TMP/MatchACEIMP8.pdf')
  fig = plt.figure(400+i+1,figsize=(20,10))
  plt.subplot(4,1,1)
  plt.plot(SCMatchData['impEpoch'],SCMatchData['aceV'],label='ACE')
@@ -352,11 +362,11 @@ for i in range(len(sTime)):
  plt.plot(SCMatchData['impEpoch'],lagging[0:len(cmnEpoch)])
  plt.ylabel('Lag (seconds)')
  plt.xlabel('IMP8 Epoch')
- plt.savefig('./figures/match' + str(401+i))
+ pp400.savefig(fig)
  plt.close(fig)
- '''
+pp400.close()
 
- '''
+'''
  nShift=20
  vCorr, vLag = xcorr(SCMatchData['impV'],SCMatchData['aceV'],shift=nShift)
  nCorr, nLag = xcorr(SCMatchData['impN'],SCMatchData['aceN'],shift=nShift)
@@ -397,7 +407,7 @@ for i in range(len(sTime)):
 #plt.savefig('./figures/corr' + str(501+i))
 #plt.close(fig)
  plt.show()
- '''
+'''
 
 srcData = {'epoch':accDesE,'V':accSrcV,'N':accSrcN,'T':accSrcT,'B':accSrcB}
 desData = {'epoch':accDesE,'V':accDesV,'N':accDesN,'T':accDesT,'B':accDesB}
@@ -454,37 +464,39 @@ plt.close(fig)
 '''
 
 nPins = 100
-vRanges = [[251,300],[301,350],[351,400],[401,450],[451,500],[501,550],[551,600]]
-vRanges = vRanges + [[601,650],[651,700],[701,750],[751,800],[801,850],[851,900]]
-vRanges = vRanges + [[901,950],[951,1000],[1001,1050],[1051,1100],[1101,1150],[1151,1200]]
+vThreshold = 200
+vRanges = [[251,275],[276,300],[301,325],[326,350],[351,375],[376,400],[401,425],[426,450]]
+vRanges = vRanges + [[451,475],[476,500],[501,525],[526,550],[551,575],[576,600]]
+vRanges = vRanges + [[601,625],[626,650],[651,675],[676,700],[701,725],[726,750],[751,775],[776,800]]
+vRanges = vRanges + [[801,825],[826,850],[851,875],[876,900],[901,925],[926,950],[951,975],[976,1000]]
 
 try:
- DesRangesALL, DesKDEALL = getDesKDE(srcData['V'],desData['V'],vRanges,nPins)
+ DesRangesALL, DesKDEALL, KDEfuncALL = getDesKDE(srcData['V'],desData['V'],vRanges,threshold=vThreshold,nPins=nPins)
  ALLFlag = True
 except:
  ALLFlag = False
 try:
- DesRangesEJT, DesKDEEJT = getDesKDE(swClassSrc['VEJT'],swClassDes['VEJT'],vRanges,nPins)
+ DesRangesEJT, DesKDEEJT, KDEfuncEJT = getDesKDE(swClassSrc['VEJT'],swClassDes['VEJT'],vRanges,threshold=vThreshold,nPins=nPins)
  EJTFlag = True
 except:
  EJTFlag = False
 try:
- DesRangesCHO, DesKDECHO = getDesKDE(swClassSrc['VCHO'],swClassDes['VCHO'],vRanges,nPins)
+ DesRangesCHO, DesKDECHO, KDEfuncCHO = getDesKDE(swClassSrc['VCHO'],swClassDes['VCHO'],vRanges,threshold=vThreshold,nPins=nPins)
  CHOFlag = True
 except:
  CHOFlag = False
 try:
- DesRangesSRR, DesKDESRR = getDesKDE(swClassSrc['VSRR'],swClassDes['VSRR'],vRanges,nPins)
+ DesRangesSRR, DesKDESRR, KDEfuncSRR = getDesKDE(swClassSrc['VSRR'],swClassDes['VSRR'],vRanges,threshold=vThreshold,nPins=nPins)
  SRRFlag = True
 except:
  SRRFlag = False
 try:
- DesRangesSBO, DesKDESBO = getDesKDE(swClassSrc['VSBO'],swClassDes['VSBO'],vRanges,nPins)
+ DesRangesSBO, DesKDESBO, KDEfuncSBO = getDesKDE(swClassSrc['VSBO'],swClassDes['VSBO'],vRanges,threshold=vThreshold,nPins=nPins)
  SBOFlag = True
 except:
  SBOFlag = False
 
-pp = PdfPages('./figures/SWCatKDE.pdf')
+pp = PdfPages('./figures/TMP/SWCatKDE.pdf')
 for j in range(len(DesKDEALL)):
  fig = plt.figure(601+j,figsize=(10,10))
  if EJTFlag and DesKDEEJT[j] != []:
@@ -510,15 +522,17 @@ for j in range(len(DesKDEALL)):
   plt.axvline(x=vRanges[j][0])
   plt.axvline(x=vRanges[j][1])
   pp.savefig(fig)
-# plt.savefig('./figures/SWCatKDE' + str(601+j))
-  plt.close(fig)
+ plt.close(fig)
 pp.close()
 
-pp = PdfPages('./figures/KDE.pdf')
+vDestStd = numpy.zeros(len(vRanges))
+
+pp = PdfPages('./figures/TMP/KDE.pdf')
 for j in range(len(DesKDEALL)):
  fig = plt.figure(701+j,figsize=(10,10))
  if ALLFlag and DesKDEALL[j] != []:
   xVals = numpy.linspace(min(DesRangesALL[j]),max(DesRangesALL[j]),nPins)
+  vDestStd[j] = numpy.std(xVals)
   plt.plot(xVals,DesKDEALL[j],color='k')
   plt.suptitle('Source Speed Ranges = [' + str(vRanges[j][0]) + ',' + str(vRanges[j][1]) + '] (km/s)', fontsize = 20)
   plt.title('KDE of Propagated Solar Wind for 4 hours Slots', fontsize = 20)
@@ -527,8 +541,43 @@ for j in range(len(DesKDEALL)):
   plt.axvline(x=vRanges[j][0])
   plt.axvline(x=vRanges[j][1])
   pp.savefig(fig)
-# plt.savefig('./figures/KDE' + str(701+j))
-  plt.close(fig)
+ plt.close(fig)
+pp.close()
+
+sDate       = datetime.datetime(2003, 1,25, 0, 0, 0)
+eDate       = datetime.datetime(2003, 3,10,23,59,59)
+locDateList = dateList(sDate, eDate, shift = 'hour')
+if ACEDataFlag:
+ dataSRC = 'ace'
+ swParams = ['Magnitude','Np','Vp','Tpr','BGSEc','V_GSE','SC_pos_GSE']
+ print('Reading ACE Dataset')
+ aceData  = getACEdata(locDateList,'/home/ehab/SWData',swParams,['16sec','1min'],dataStat='clean')
+ print('Adjusting ACE Dataset')
+ aceData  = aceDataAdjust(aceData)
+
+
+uniDateList = dateList(sDate, eDate, shift = 'minute')
+sEpochID    = bisect.bisect_left(aceData['plasmaEpoch'], sDate)
+eEpochID    = bisect.bisect_left(aceData['plasmaEpoch'], eDate)
+aceEpoch    = numpy.array(aceData['plasmaEpoch'][sEpochID:eEpochID])
+EE,VV       = removeNaN(aceData['V'][sEpochID:eEpochID],aceEpoch)
+aceVmod     = mapDataToEpoch(uniDateList,EE,VV,interpKind='linear')
+aceEE       = uniDateList
+MedFilterTS = 30
+aceVV       = swMedFilter(aceEE,aceVmod,MedFilterTS*60)
+
+vpstd, vbase, vmstd, vepoch = getSurrogate(vRanges,KDEfuncALL,aceVV,aceEE,nSamples=1000)
+pp = PdfPages('./figures/TMP/speed.pdf')
+fig = plt.figure(801,figsize=(15,15))
+plt.plot(vepoch,vbase,'k-')
+plt.hold(True)
+plt.fill_between(vepoch,vmstd,vpstd,alpha=0.5,facecolor='blue')
+plt.title('Solar Wind Ensemble at IMP8 Jan-Mar 2003')
+plt.xlabel('Epoch')
+plt.ylabel('Solar Wind Speed')
+plt.xticks(rotation='45')
+pp.savefig(fig)
+plt.close(fig)
 pp.close()
 
 #srcDataEJT = {'epoch':swClassSrc['EEJT'],'V':swClassSrc['VEJT'],'N':swClassSrc['NEJT'],'T':swClassSrc['TEJT'],'B':swClassSrc['BEJT']}
