@@ -5,6 +5,8 @@ import datetime as dt
 import numpy as np
 from spacepy import pycdf
 
+SWDpath = '/home/ehab/SWData'
+
 def checkConnection():
     conn = httplib.HTTPConnection("www.google.com")
     try:
@@ -61,7 +63,7 @@ def getOMNIfiles(omniDates,dataLoc,omniSet='hourly'):
             if checkConnection():
                 webPath = "ftp://" + fullPath[:len(fullPath)]
                 print("Connect to " + webPath)
-                envComm = "wget -P /home/ehab/SWData" + " -r -l1 -A.cdf " + webPath
+                envComm = "wget -P {0}".format(SWDpath) + " -r -l1 -A.cdf " + webPath
                 print(envComm)
                 os.system(envComm)
             else:
@@ -917,7 +919,7 @@ def getGeotailfiles(geotailDates,dataLoc,geotailSet='1min'):
             if checkConnection():
                 webPath = "ftp://" + fullPath[:len(fullPath)]
                 print("Connect to " + webPath)
-                envComm = "wget -P /home/ehab/SWData" + " -r -l1 -A.cdf " + webPath
+                envComm = "wget -P {0}".format(SWDpath) + " -r -l1 -A.cdf " + webPath
                 print(envComm)
                 os.system(envComm)
             else:
