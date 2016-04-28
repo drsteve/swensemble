@@ -1,48 +1,23 @@
-import os
-import sys
+import os, sys
 sys.path.append('/home/ehab/MyFiles/Softex/spacePy/spacepy-0.1.5')
 
 from matplotlib.backends.backend_pdf import *
-
-import json
-import math
-import numpy
-import scipy
-import bisect
-from bisect import bisect_left
-import scipy.stats
-import datetime, time
-from datetime import timedelta
-from numpy import transpose
-from numpy.linalg import norm
-from datetime import date
-from spacepy import pycdf
-from spacepy import seapy
-from itertools import chain
-from scipy.stats import pearsonr, spearmanr
-import spacepy.time as spt
-from scipy.signal import medfilt
-
+import json, bisect
+import datetime as dt
+import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
-from scipy.integrate import simps, trapz
-from scipy.stats import ks_2samp, pearsonr, gaussian_kde
-
-from swdatanal import getDistrib, getIndices, omniDataCorr, ccorr, xcorr
-from swdatanal import kdeBW, getDesKDE, getSWPRange, getSurrogate
-from swdatanal import search, epochBlock, findCorrEpoch, dataFilter
-from swdatanal import getSolarWindType, getTimeLag, swMedFilter, rejectOutliers
-from getswdata import getOMNIfiles, getOMNIdata, getOMNIparams, omniDataAdjust
-from getswdata import getACEfiles, getACEdata, getACEparams, aceDataAdjust
-from getswdata import getIMP8files,getIMP8data, getIMP8params, imp8DataAdjust
-from getswdata import getWINDfiles,getWINDdata, getWINDparams, windDataAdjust
-from getswdata import getGeotailfiles,getGeotaildata, getGeotailparams, geotailDataAdjust
-from getswdata import dataClean, dateShift, dateList, mapDataToEpoch, epochShift, commonEpoch, removeNaN
+from swdatanal import getDistrib, getIndices, omniDataCorr, ccorr, xcorr, kdeBW, getDesKDE, getSWPRange, getSurrogate, \
+	search, epochBlock, findCorrEpoch, dataFilter, getSolarWindType, getTimeLag, swMedFilter, rejectOutliers
+from getswdata import getOMNIfiles, getOMNIdata, getOMNIparams, omniDataAdjust, getACEfiles, getACEdata, getACEparams, aceDataAdjust, \
+	getIMP8files,getIMP8data, getIMP8params, imp8DataAdjust, getWINDfiles,getWINDdata, getWINDparams, windDataAdjust, \
+	getGeotailfiles,getGeotaildata, getGeotailparams, geotailDataAdjust, dataClean, dateShift, dateList, \
+	mapDataToEpoch, epochShift, commonEpoch, removeNaN
 
 
-startDate   = datetime.datetime(1998, 1, 1, 0, 0, 0)
-endDate     = datetime.datetime(2000,12,31,23,59,59)
+
+startDate   = dt.datetime(1998, 1, 1, 0, 0, 0)
+endDate     = dt.datetime(2000,12,31,23,59,59)
 locDateList = dateList(startDate, endDate, shift = 'hour')
 
 GeotailDataFlag = False
@@ -175,8 +150,8 @@ pBlockStart = epochBlock(aceData['magneticEpoch'], aceData['Bz'], blockLen = tim
 refBlockStart = findCorrEpoch(refBlockStart,pBlockStart)
 
 for iBlock in refBlockStart:
- sEpochID  = bisect_left(imp8Data['plasmaEpoch'], iBlock + timedelta(0,0))
- eEpochID  = bisect_left(imp8Data['plasmaEpoch'], iBlock + timedelta(0,timeShift*3600))
+ sEpochID  = bisect_left(imp8Data['plasmaEpoch'], iBlock + dt.timedelta(0,0))
+ eEpochID  = bisect_left(imp8Data['plasmaEpoch'], iBlock + dt.timedelta(0,timeShift*3600))
  if len(dataFilter(imp8Data['SCxGSE'][sEpochID:eEpochID],0.0,'<')) >= 1: refBlockStart.remove(iBlock)
 
 sTime = []; eTime = []
@@ -191,19 +166,19 @@ for i in range(len(sTime)):
  print sTime[i]
  uniDateList = dateList(sTime[i], eTime[i], shift = 'minute')
 
- sEpochBIDI  = bisect.bisect_left(imp8Data['magneticEpoch'], sTime[i])
- eEpochBIDI  = bisect.bisect_left(imp8Data['magneticEpoch'], eTime[i])
- sEpochPIDI  = bisect.bisect_left(imp8Data['plasmaEpoch'], sTime[i])
- eEpochPIDI  = bisect.bisect_left(imp8Data['plasmaEpoch'], eTime[i])
- impPEpoch   = numpy.array(imp8Data['plasmaEpoch'][sEpochPIDI:eEpochPIDI])
- impBEpoch   = numpy.array(imp8Data['magneticEpoch'][sEpochBIDI:eEpochBIDI])
+ sEpochBIDI  = bisect_left(imp8Data['magneticEpoch'], sTime[i])
+ eEpochBIDI  = bisect_left(imp8Data['magneticEpoch'], eTime[i])
+ sEpochPIDI  = bisect_left(imp8Data['plasmaEpoch'], sTime[i])
+ eEpochPIDI  = bisect_left(imp8Data['plasmaEpoch'], eTime[i])
+ impPEpoch   = np.array(imp8Data['plasmaEpoch'][sEpochPIDI:eEpochPIDI])
+ impBEpoch   = np.array(imp8Data['magneticEpoch'][sEpochBIDI:eEpochBIDI])
  
- sEpochBIDA  = bisect.bisect_left(aceData['magneticEpoch'], sTime[i])
- eEpochBIDA  = bisect.bisect_left(aceData['magneticEpoch'], eTime[i])
- sEpochPIDA  = bisect.bisect_left(aceData['plasmaEpoch'], sTime[i])
- eEpochPIDA  = bisect.bisect_left(aceData['plasmaEpoch'], eTime[i])
- acePEpoch   = numpy.array(aceData['plasmaEpoch'][sEpochPIDA:eEpochPIDA])
- aceBEpoch   = numpy.array(aceData['magneticEpoch'][sEpochBIDA:eEpochBIDA])
+ sEpochBIDA  = bisect_left(aceData['magneticEpoch'], sTime[i])
+ eEpochBIDA  = bisect_left(aceData['magneticEpoch'], eTime[i])
+ sEpochPIDA  = bisect_left(aceData['plasmaEpoch'], sTime[i])
+ eEpochPIDA  = bisect_left(aceData['plasmaEpoch'], eTime[i])
+ acePEpoch   = np.array(aceData['plasmaEpoch'][sEpochPIDA:eEpochPIDA])
+ aceBEpoch   = np.array(aceData['magneticEpoch'][sEpochBIDA:eEpochBIDA])
 
  try:
   EE,VV   = removeNaN(aceData['V'][sEpochPIDA:eEpochPIDA],acePEpoch)
@@ -500,19 +475,19 @@ pp = PdfPages('./figures/TMP/SWCatKDE.pdf')
 for j in range(len(DesKDEALL)):
  fig = plt.figure(601+j,figsize=(10,10))
  if EJTFlag and DesKDEEJT[j] != []:
-  xVals = numpy.linspace(min(DesRangesEJT[j]),max(DesRangesEJT[j]),nPins)
+  xVals = np.linspace(min(DesRangesEJT[j]),max(DesRangesEJT[j]),nPins)
   plt.plot(xVals,DesKDEEJT[j],color='b',label='Ejecta')
  if CHOFlag and DesKDECHO[j] != []:
-  xVals = numpy.linspace(min(DesRangesCHO[j]),max(DesRangesCHO[j]),nPins)
+  xVals = np.linspace(min(DesRangesCHO[j]),max(DesRangesCHO[j]),nPins)
   plt.plot(xVals,DesKDECHO[j],color='r',label='Coronal-Hole')
  if SRRFlag and DesKDESRR[j] != []:
-  xVals = numpy.linspace(min(DesRangesSRR[j]),max(DesRangesSRR[j]),nPins)
+  xVals = np.linspace(min(DesRangesSRR[j]),max(DesRangesSRR[j]),nPins)
   plt.plot(xVals,DesKDESRR[j],color='m',label='Sector-Reversal')
  if SBOFlag and DesKDESBO[j] != []:
-  xVals = numpy.linspace(min(DesRangesSBO[j]),max(DesRangesSBO[j]),nPins)
+  xVals = np.linspace(min(DesRangesSBO[j]),max(DesRangesSBO[j]),nPins)
   plt.plot(xVals,DesKDESBO[j],color='g',label='Streamer-Belt')
  if ALLFlag and DesKDEALL[j] != []:
-  xVals = numpy.linspace(min(DesRangesALL[j]),max(DesRangesALL[j]),nPins)
+  xVals = np.linspace(min(DesRangesALL[j]),max(DesRangesALL[j]),nPins)
   plt.plot(xVals,DesKDEALL[j],color='k',label='Uncategorized')
   plt.suptitle('Source Speed Ranges = [' + str(vRanges[j][0]) + ',' + str(vRanges[j][1]) + '] (km/s)', fontsize = 20)
   plt.title('KDE of Propagated Solar Wind for 4 hours Slots', fontsize = 20)
@@ -525,14 +500,14 @@ for j in range(len(DesKDEALL)):
  plt.close(fig)
 pp.close()
 
-vDestStd = numpy.zeros(len(vRanges))
+vDestStd = np.zeros(len(vRanges))
 
 pp = PdfPages('./figures/TMP/KDE.pdf')
 for j in range(len(DesKDEALL)):
  fig = plt.figure(701+j,figsize=(10,10))
  if ALLFlag and DesKDEALL[j] != []:
-  xVals = numpy.linspace(min(DesRangesALL[j]),max(DesRangesALL[j]),nPins)
-  vDestStd[j] = numpy.std(xVals)
+  xVals = np.linspace(min(DesRangesALL[j]),max(DesRangesALL[j]),nPins)
+  vDestStd[j] = np.std(xVals)
   plt.plot(xVals,DesKDEALL[j],color='k')
   plt.suptitle('Source Speed Ranges = [' + str(vRanges[j][0]) + ',' + str(vRanges[j][1]) + '] (km/s)', fontsize = 20)
   plt.title('KDE of Propagated Solar Wind for 4 hours Slots', fontsize = 20)
@@ -544,8 +519,8 @@ for j in range(len(DesKDEALL)):
  plt.close(fig)
 pp.close()
 
-sDate       = datetime.datetime(2003, 1,25, 0, 0, 0)
-eDate       = datetime.datetime(2003, 3,10,23,59,59)
+sDate       = dt.datetime(2003, 1,25, 0, 0, 0)
+eDate       = dt.datetime(2003, 3,10,23,59,59)
 locDateList = dateList(sDate, eDate, shift = 'hour')
 if ACEDataFlag:
  dataSRC = 'ace'
@@ -557,9 +532,9 @@ if ACEDataFlag:
 
 
 uniDateList = dateList(sDate, eDate, shift = 'minute')
-sEpochID    = bisect.bisect_left(aceData['plasmaEpoch'], sDate)
-eEpochID    = bisect.bisect_left(aceData['plasmaEpoch'], eDate)
-aceEpoch    = numpy.array(aceData['plasmaEpoch'][sEpochID:eEpochID])
+sEpochID    = bisect_left(aceData['plasmaEpoch'], sDate)
+eEpochID    = bisect_left(aceData['plasmaEpoch'], eDate)
+aceEpoch    = np.array(aceData['plasmaEpoch'][sEpochID:eEpochID])
 EE,VV       = removeNaN(aceData['V'][sEpochID:eEpochID],aceEpoch)
 aceVmod     = mapDataToEpoch(uniDateList,EE,VV,interpKind='linear')
 aceEE       = uniDateList
